@@ -1,0 +1,53 @@
+{
+  "rules": [
+    {
+      "id": "rule-001",
+      "name": "SWITCH over nested IFs",
+      "rule_type": "formula_style",
+      "description": "Use SWITCH statements instead of nested IF statements for mapping values. This improves readability and makes batch updates easier.",
+      "content": "When mapping a value to multiple possible outputs based on equality, use SWITCH(value, case1, result1, case2, result2, ..., default) instead of IF(value=case1, result1, IF(value=case2, result2, ...)).",
+      "examples": [
+        "SWITCH(TRIM(A1),\"Option1\",100,\"Option2\",200,0)",
+        "SWITCH(status,\"Active\",1,\"Inactive\",0,\"Pending\",0.5,-1)"
+      ],
+      "tags": ["readability", "maintainability"]
+    },
+    {
+      "id": "rule-002",
+      "name": "TRIM string inputs",
+      "rule_type": "formula_style",
+      "description": "Always wrap string comparisons with TRIM() to handle accidental whitespace in user input or imported data.",
+      "content": "When comparing cell values to string literals, use TRIM() to remove leading/trailing whitespace: SWITCH(TRIM(cell), ...) or IF(TRIM(cell)=\"value\", ...).",
+      "examples": [
+        "SWITCH(TRIM(B4),\"Corruption\",28.6%,...)",
+        "IF(TRIM(A1)=\"Active\",...)"
+      ],
+      "tags": ["robustness", "data-quality"]
+    },
+    {
+      "id": "rule-003",
+      "name": "Named ranges for shared constants",
+      "rule_type": "naming",
+      "description": "Use named ranges for constants that are referenced across multiple sheets. This makes global updates trivial.",
+      "content": "Define named ranges for: teammate buff percentages, kit coefficients, rotation timings. Format: {category}_{identifier}_{property} e.g., teammate1_buff, corruption_ratio.",
+      "examples": [
+        "teammate1_buff",
+        "corruption_ratio",
+        "rotation1_duration"
+      ],
+      "tags": ["maintainability", "organization"]
+    },
+    {
+      "id": "rule-004",
+      "name": "ROUND final outputs",
+      "rule_type": "formula_style",
+      "description": "Wrap final damage/healing calculations with ROUND() to produce clean integer values for display.",
+      "content": "Use ROUND(calculation, 0) for final damage values. This avoids displaying confusing decimal places while maintaining precision in intermediate calculations.",
+      "examples": [
+        "=ROUND(base_damage*multiplier,0)",
+        "=ROUND(B3*SWITCH(...),0)"
+      ],
+      "tags": ["display", "user-experience"]
+    }
+  ]
+}

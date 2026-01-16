@@ -1,0 +1,28 @@
+{
+  "patch_id": "patch-002-teammate-replace",
+  "spreadsheet_id": "example-spreadsheet-123",
+  "description": "Replace teammate1 with teammate3 in Abloom Build A",
+  "created_at": "2024-01-16T14:00:00Z",
+  "status": "pending",
+  "changes": [
+    {
+      "sheet": "Abloom Build A",
+      "cell": "C10",
+      "old": "=B5+B6+IF(teammate1_active,B3*teammate1_buff,0)",
+      "new": "=B5+B6+IF(teammate3_active,B3*teammate3_buff,0)"
+    },
+    {
+      "sheet": "Abloom Build A",
+      "cell": "C15",
+      "old": "=IF(teammate1_active,ROUND(B3*0.15,0),0)",
+      "new": "=IF(teammate3_active,ROUND(B3*0.22,0),0)"
+    },
+    {
+      "sheet": "Abloom Build A",
+      "cell": "C20",
+      "old": "=teammate1_duration",
+      "new": "=teammate3_duration"
+    }
+  ],
+  "notes": "teammate3 has a higher buff (22% vs 15%) but different duration. Make sure to update duration references as well."
+}

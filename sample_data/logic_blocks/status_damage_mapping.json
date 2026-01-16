@@ -1,0 +1,20 @@
+{
+  "id": "logic-block-001",
+  "name": "Status Damage Ratio Mapping",
+  "block_type": "kit",
+  "description": "Maps status effect names to their damage ratio coefficients. Used across all character builds to calculate status damage.",
+  "formula_pattern": "SWITCH(TRIM({status_cell}),\"Corruption\",{corruption_ratio},\"Shock\",{shock_ratio},\"Burn\",{burn_ratio},0)",
+  "variables": {
+    "status_cell": "The cell containing the current status effect name",
+    "corruption_ratio": "Damage ratio for Corruption status (e.g., 28.6%)",
+    "shock_ratio": "Damage ratio for Shock status (e.g., 14.9%)",
+    "burn_ratio": "Damage ratio for Burn status (e.g., 37.1%)"
+  },
+  "examples": [
+    "SWITCH(TRIM(B4),\"Corruption\",28.6%,\"Shock\",14.9%,\"Burn\",37.1%,0)",
+    "SWITCH(TRIM(D7),\"Corruption\",28.6%,\"Shock\",14.9%,\"Burn\",37.1%,0)"
+  ],
+  "tags": ["status", "damage", "kit", "shared-logic"],
+  "version": "1.0",
+  "last_updated": "2024-01-15"
+}

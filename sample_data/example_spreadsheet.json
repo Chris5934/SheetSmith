@@ -1,0 +1,101 @@
+{
+  "spreadsheet_id": "example-spreadsheet-123",
+  "title": "Damage Calculator - All Builds",
+  "sheets": [
+    {
+      "title": "Abloom Build A",
+      "cells": [
+        {
+          "cell": "B5",
+          "value": 2860,
+          "formula": "=ROUND(B3*SWITCH(TRIM(B4),\"Corruption\",28.6%,\"Shock\",14.9%,\"Burn\",37.1%,0),0)"
+        },
+        {
+          "cell": "B6",
+          "value": 1250,
+          "formula": "=IF(B4=\"Corruption\",B3*0.125,0)"
+        },
+        {
+          "cell": "C10",
+          "value": 5500,
+          "formula": "=B5+B6+IF(teammate1_active,B3*teammate1_buff,0)"
+        }
+      ]
+    },
+    {
+      "title": "Abloom Build B",
+      "cells": [
+        {
+          "cell": "B5",
+          "value": 2860,
+          "formula": "=ROUND(B3*SWITCH(TRIM(B4),\"Corruption\",28.6%,\"Shock\",14.9%,\"Burn\",37.1%,0),0)"
+        },
+        {
+          "cell": "B6",
+          "value": 1250,
+          "formula": "=IF(B4=\"Corruption\",B3*0.125,0)"
+        },
+        {
+          "cell": "C10",
+          "value": 6200,
+          "formula": "=B5+B6+IF(teammate2_active,B3*teammate2_buff,0)"
+        }
+      ]
+    },
+    {
+      "title": "Pyre Build",
+      "cells": [
+        {
+          "cell": "D8",
+          "value": 3710,
+          "formula": "=ROUND(D6*SWITCH(TRIM(D7),\"Corruption\",28.6%,\"Shock\",14.9%,\"Burn\",37.1%,0),0)"
+        },
+        {
+          "cell": "D9",
+          "value": 0,
+          "formula": "=IF(D7=\"Burn\",D6*0.20,0)"
+        }
+      ]
+    },
+    {
+      "title": "Calculations",
+      "cells": [
+        {
+          "cell": "A1",
+          "value": "Status Damage Ratios",
+          "formula": null
+        },
+        {
+          "cell": "A2",
+          "value": "Corruption",
+          "formula": null
+        },
+        {
+          "cell": "B2",
+          "value": 0.286,
+          "formula": "=28.6%"
+        },
+        {
+          "cell": "A3",
+          "value": "Shock",
+          "formula": null
+        },
+        {
+          "cell": "B3",
+          "value": 0.149,
+          "formula": "=14.9%"
+        },
+        {
+          "cell": "A4",
+          "value": "Burn",
+          "formula": null
+        },
+        {
+          "cell": "B4",
+          "value": 0.371,
+          "formula": "=37.1%"
+        }
+      ]
+    }
+  ]
+}
