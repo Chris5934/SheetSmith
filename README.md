@@ -107,8 +107,11 @@ This allows the agent to improve suggestions over time and adapt to a specific s
 
 ---
 
-## Sample data
-The /sample_data folder contains fake spreadsheet exports and example patches that demonstrate the expected structure of inputs and outputs, without using real data.
+## Sample data (planned)
+This repository will include a `/sample_data` folder containing fake spreadsheet exports and example patches that demonstrate the expected structure of inputs and outputs, without using real data.
+
+At the time of submission, this folder has not yet been populated and serves as a placeholder for future development.
+
 
 ---
 
