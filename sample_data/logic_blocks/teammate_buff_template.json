@@ -1,0 +1,20 @@
+{
+  "id": "logic-block-002",
+  "name": "Teammate Buff Calculation",
+  "block_type": "teammate",
+  "description": "Template for calculating teammate buff contributions to damage. Checks if teammate is active and applies their buff percentage.",
+  "formula_pattern": "IF({teammate}_active,{base_stat}*{teammate}_buff,0)",
+  "variables": {
+    "teammate": "The teammate identifier (e.g., teammate1, teammate2)",
+    "base_stat": "The base stat cell to apply the buff to",
+    "teammate_buff": "Named range containing the teammate's buff percentage"
+  },
+  "examples": [
+    "IF(teammate1_active,B3*teammate1_buff,0)",
+    "IF(teammate2_active,B3*teammate2_buff,0)",
+    "IF(teammate3_active,D6*teammate3_buff,0)"
+  ],
+  "tags": ["teammate", "buff", "damage", "shared-logic"],
+  "version": "1.0",
+  "last_updated": "2024-01-15"
+}
