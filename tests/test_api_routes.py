@@ -30,7 +30,7 @@ def test_client(mock_agent):
     """Create a test client with mocked agent."""
     app = FastAPI()
     app.include_router(router, prefix="/api")
-    
+
     # Mock the get_agent function to return our mock
     with patch("sheetsmith.api.routes.get_agent", return_value=mock_agent):
         yield TestClient(app)
@@ -43,11 +43,8 @@ class TestChatEndpoint:
     async def test_chat_basic_functionality(self, test_client, mock_agent):
         """Test basic chat functionality with mocked agent."""
         with patch("sheetsmith.api.routes.get_agent", return_value=mock_agent):
-            response = test_client.post(
-                "/api/chat",
-                json={"message": "Hello, SheetSmith!"}
-            )
-        
+            response = test_client.post("/api/chat", json={"message": "Hello, SheetSmith!"})
+
         assert response.status_code == 200
         data = response.json()
         assert "response" in data
@@ -60,15 +57,11 @@ class TestChatEndpoint:
         """Test chat with spreadsheet ID adds context."""
         with patch("sheetsmith.api.routes.get_agent", return_value=mock_agent):
             response = test_client.post(
-                "/api/chat",
-                json={
-                    "message": "Update cell A1",
-                    "spreadsheet_id": "test-sheet-123"
-                }
+                "/api/chat", json={"message": "Update cell A1", "spreadsheet_id": "test-sheet-123"}
             )
-        
+
         assert response.status_code == 200
-        
+
         # Verify the agent was called with modified message including spreadsheet context
         mock_agent.process_message.assert_called_once()
         call_args = mock_agent.process_message.call_args[0][0]
@@ -78,13 +71,10 @@ class TestChatEndpoint:
     async def test_chat_handles_agent_error(self, test_client, mock_agent):
         """Test that chat endpoint handles agent errors properly."""
         mock_agent.process_message = AsyncMock(side_effect=Exception("Agent error"))
-        
+
         with patch("sheetsmith.api.routes.get_agent", return_value=mock_agent):
-            response = test_client.post(
-                "/api/chat",
-                json={"message": "Test message"}
-            )
-        
+            response = test_client.post("/api/chat", json={"message": "Test message"})
+
         assert response.status_code == 500
         assert "Agent error" in response.json()["detail"]
 
@@ -103,12 +93,12 @@ class TestChatEndpoint:
                 "/api/chat",
                 json={
                     "message": "Update spreadsheet test-sheet-456",
-                    "spreadsheet_id": "test-sheet-456"
-                }
+                    "spreadsheet_id": "test-sheet-456",
+                },
             )
-        
+
         assert response.status_code == 200
-        
+
         # Message should not have duplicate context since it already mentions spreadsheet
         mock_agent.process_message.assert_called_once()
         call_args = mock_agent.process_message.call_args[0][0]
@@ -123,12 +113,12 @@ class TestResetChatEndpoint:
         """Test that reset chat endpoint works correctly."""
         with patch("sheetsmith.api.routes.get_agent", return_value=mock_agent):
             response = test_client.post("/api/chat/reset")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ok"
         assert "message" in data
-        
+
         # Verify agent's reset method was called
         mock_agent.reset_conversation.assert_called_once()
 
@@ -136,7 +126,7 @@ class TestResetChatEndpoint:
         """Test that reset returns appropriate message."""
         with patch("sheetsmith.api.routes.get_agent", return_value=mock_agent):
             response = test_client.post("/api/chat/reset")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["message"] == "Conversation reset"
@@ -153,19 +143,13 @@ class TestRequestResponseModels:
 
     def test_chat_request_with_spreadsheet_id(self):
         """Test ChatRequest model with optional spreadsheet_id."""
-        request = ChatRequest(
-            message="Test message",
-            spreadsheet_id="sheet-123"
-        )
+        request = ChatRequest(message="Test message", spreadsheet_id="sheet-123")
         assert request.message == "Test message"
         assert request.spreadsheet_id == "sheet-123"
 
     def test_chat_response_model(self):
         """Test ChatResponse model structure."""
-        response = ChatResponse(
-            response="Test response",
-            conversation_length=5
-        )
+        response = ChatResponse(response="Test response", conversation_length=5)
         assert response.response == "Test response"
         assert response.conversation_length == 5
 

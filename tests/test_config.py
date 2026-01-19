@@ -1,9 +1,7 @@
 """Tests for the config module."""
 
-import os
 from pathlib import Path
 
-import pytest
 
 from sheetsmith.config import Settings, _parse_cors_origins
 
@@ -51,9 +49,9 @@ class TestSettings:
             "MAX_TOKENS",
         ]:
             monkeypatch.delenv(key, raising=False)
-        
+
         settings = Settings()
-        
+
         # Check default values
         assert settings.google_credentials_path == Path("credentials.json")
         assert settings.google_token_path == Path("token.json")
@@ -72,7 +70,7 @@ class TestSettings:
         creds_path = tmp_path / "test_creds.json"
         token_path = tmp_path / "test_token.json"
         db_path = tmp_path / "test.db"
-        
+
         # Create Settings instance with explicit parameters
         settings = Settings(
             google_credentials_path=creds_path,
@@ -87,7 +85,7 @@ class TestSettings:
             debug=True,
             max_tokens=8192,
         )
-        
+
         assert settings.google_credentials_path == creds_path
         assert settings.google_token_path == token_path
         assert settings.database_path == db_path
@@ -107,17 +105,15 @@ class TestSettings:
             google_token_path=Path(tmp_path / "token.json"),
             database_path=Path(tmp_path / "db.db"),
         )
-        
+
         assert isinstance(settings.google_credentials_path, Path)
         assert isinstance(settings.google_token_path, Path)
         assert isinstance(settings.database_path, Path)
 
     def test_settings_cors_origins_parsing(self, monkeypatch):
         """Test CORS origins are properly parsed."""
-        settings = Settings(
-            cors_allow_origins=["http://localhost:3000", "http://example.com"]
-        )
-        
+        settings = Settings(cors_allow_origins=["http://localhost:3000", "http://example.com"])
+
         assert settings.cors_allow_origins == ["http://localhost:3000", "http://example.com"]
 
     def test_settings_debug_flag_variations(self, monkeypatch):
@@ -125,7 +121,7 @@ class TestSettings:
         # Test True
         settings = Settings(debug=True)
         assert settings.debug is True
-        
+
         # Test False
         settings = Settings(debug=False)
         assert settings.debug is False
@@ -133,7 +129,7 @@ class TestSettings:
     def test_settings_openrouter_model_default(self, monkeypatch):
         """Test OpenRouter model has correct default."""
         monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
-        
+
         settings = Settings()
-        
+
         assert settings.openrouter_model == "anthropic/claude-3.5-sonnet"

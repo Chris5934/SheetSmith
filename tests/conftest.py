@@ -2,11 +2,10 @@
 
 import os
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock, MagicMock
+from unittest.mock import Mock
 from typing import AsyncGenerator
 
 import pytest
-import aiosqlite
 
 from sheetsmith.config import Settings
 from sheetsmith.sheets import GoogleSheetsClient
@@ -21,10 +20,10 @@ def mock_settings(tmp_path: Path) -> Settings:
     creds_file = tmp_path / "credentials.json"
     token_file = tmp_path / "token.json"
     db_file = tmp_path / "test.db"
-    
+
     creds_file.write_text('{"installed": {"client_id": "test"}}')
     token_file.write_text('{"token": "test"}')
-    
+
     # Override environment variables for this test
     os.environ["GOOGLE_CREDENTIALS_PATH"] = str(creds_file)
     os.environ["GOOGLE_TOKEN_PATH"] = str(token_file)
@@ -32,7 +31,7 @@ def mock_settings(tmp_path: Path) -> Settings:
     os.environ["ANTHROPIC_API_KEY"] = "test-key-123"
     os.environ["LLM_PROVIDER"] = "anthropic"
     os.environ["MODEL_NAME"] = "claude-sonnet-4-20250514"
-    
+
     # Create fresh Settings instance
     settings = Settings(
         google_credentials_path=creds_file,
@@ -47,7 +46,7 @@ def mock_settings(tmp_path: Path) -> Settings:
         cors_allow_origins=["*"],
         max_tokens=4096,
     )
-    
+
     return settings
 
 
@@ -55,23 +54,27 @@ def mock_settings(tmp_path: Path) -> Settings:
 def mock_sheets_client() -> Mock:
     """Create a mocked Google Sheets client."""
     client = Mock(spec=GoogleSheetsClient)
-    
+
     # Mock common methods
-    client.get_spreadsheet_info = Mock(return_value={
-        "spreadsheet_id": "test-sheet-123",
-        "title": "Test Sheet",
-        "sheets": [{"title": "Sheet1", "id": 0}],
-    })
-    
-    client.read_range = Mock(return_value=Mock(
-        spreadsheet_id="test-sheet-123",
-        sheet_name="Sheet1",
-        range_notation="A1:B2",
-        cells=[],
-    ))
-    
+    client.get_spreadsheet_info = Mock(
+        return_value={
+            "spreadsheet_id": "test-sheet-123",
+            "title": "Test Sheet",
+            "sheets": [{"title": "Sheet1", "id": 0}],
+        }
+    )
+
+    client.read_range = Mock(
+        return_value=Mock(
+            spreadsheet_id="test-sheet-123",
+            sheet_name="Sheet1",
+            range_notation="A1:B2",
+            cells=[],
+        )
+    )
+
     client.search_formulas = Mock(return_value=[])
-    
+
     return client
 
 
@@ -89,17 +92,17 @@ async def mock_memory_store(tmp_path: Path) -> AsyncGenerator[MemoryStore, None]
 def mock_anthropic_client() -> Mock:
     """Create a mocked Anthropic client."""
     client = Mock(spec=AnthropicClient)
-    
+
     # Mock the messages.create method
     mock_response = Mock()
     mock_response.content = [Mock(text="Test response from Claude")]
     mock_response.stop_reason = "end_turn"
     mock_response.usage = Mock(input_tokens=100, output_tokens=50)
-    
+
     client.client = Mock()
     client.client.messages = Mock()
     client.client.messages.create = Mock(return_value=mock_response)
-    
+
     return client
 
 

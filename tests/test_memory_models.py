@@ -1,9 +1,7 @@
 """Tests for memory models."""
 
 from datetime import datetime
-import json
 
-import pytest
 
 from sheetsmith.memory.models import Rule, LogicBlock, AuditLog, FixSummary
 
@@ -20,7 +18,7 @@ class TestRuleModel:
             rule_type="formula_style",
             content="Use VLOOKUP instead of INDEX/MATCH",
         )
-        
+
         assert rule.id == "rule-123"
         assert rule.name == "Test Rule"
         assert rule.description == "A test rule"
@@ -35,7 +33,7 @@ class TestRuleModel:
         """Test creating a Rule with all fields."""
         created = datetime(2024, 1, 1, 12, 0, 0)
         updated = datetime(2024, 1, 2, 12, 0, 0)
-        
+
         rule = Rule(
             id="rule-456",
             name="Complete Rule",
@@ -47,7 +45,7 @@ class TestRuleModel:
             updated_at=updated,
             tags=["naming", "style"],
         )
-        
+
         assert len(rule.examples) == 2
         assert rule.examples[0] == "my_variable"
         assert len(rule.tags) == 2
@@ -65,7 +63,7 @@ class TestRuleModel:
             content="Test content",
         )
         after = datetime.utcnow()
-        
+
         assert before <= rule.created_at <= after
         assert before <= rule.updated_at <= after
 
@@ -79,9 +77,9 @@ class TestRuleModel:
             content="Test structure",
             tags=["test"],
         )
-        
+
         rule_dict = rule.model_dump()
-        
+
         assert rule_dict["id"] == "rule-serial"
         assert rule_dict["name"] == "Serial Rule"
         assert rule_dict["rule_type"] == "structure"
@@ -101,7 +99,7 @@ class TestLogicBlockModel:
             description="A test logic block",
             formula_pattern="=SUM({range})",
         )
-        
+
         assert block.id == "block-123"
         assert block.name == "Test Block"
         assert block.block_type == "kit"
@@ -119,7 +117,7 @@ class TestLogicBlockModel:
             "range": "The range to sum",
             "criteria": "Optional criteria",
         }
-        
+
         block = LogicBlock(
             id="block-456",
             name="Block with Variables",
@@ -128,7 +126,7 @@ class TestLogicBlockModel:
             formula_pattern="=SUMIF({range}, {criteria})",
             variables=variables,
         )
-        
+
         assert len(block.variables) == 2
         assert block.variables["range"] == "The range to sum"
         assert block.variables["criteria"] == "Optional criteria"
@@ -144,7 +142,7 @@ class TestLogicBlockModel:
             version="2.1",
             tags=["conditional", "logic"],
         )
-        
+
         assert block.version == "2.1"
         assert len(block.tags) == 2
         assert "conditional" in block.tags
@@ -160,7 +158,7 @@ class TestLogicBlockModel:
             formula_pattern="=TEST()",
         )
         after = datetime.utcnow()
-        
+
         assert before <= block.created_at <= after
         assert before <= block.updated_at <= after
 
@@ -175,9 +173,9 @@ class TestLogicBlockModel:
             variables={"range": "Data range"},
             tags=["math"],
         )
-        
+
         block_dict = block.model_dump()
-        
+
         assert block_dict["id"] == "block-serial"
         assert block_dict["name"] == "Serial Block"
         assert block_dict["block_type"] == "kit"
@@ -195,7 +193,7 @@ class TestAuditLogModel:
             action="search",
             description="Searched for formulas",
         )
-        
+
         assert log.id == "log-123"
         assert log.action == "search"
         assert log.description == "Searched for formulas"
@@ -211,7 +209,7 @@ class TestAuditLogModel:
             "pattern": "VLOOKUP",
             "matches": 5,
         }
-        
+
         log = AuditLog(
             id="log-456",
             action="update",
@@ -221,7 +219,7 @@ class TestAuditLogModel:
             user_approved=True,
             changes_applied=5,
         )
-        
+
         assert log.spreadsheet_id == "sheet-123"
         assert log.details["pattern"] == "VLOOKUP"
         assert log.details["matches"] == 5
@@ -237,13 +235,13 @@ class TestAuditLogModel:
             description="Timestamp test",
         )
         after = datetime.utcnow()
-        
+
         assert before <= log.timestamp <= after
 
     def test_audit_log_action_types(self):
         """Test various audit log action types."""
         actions = ["search", "update", "batch_update", "rule_change"]
-        
+
         for action in actions:
             log = AuditLog(
                 id=f"log-{action}",
@@ -262,9 +260,9 @@ class TestAuditLogModel:
             details={"count": 10},
             changes_applied=10,
         )
-        
+
         log_dict = log.model_dump()
-        
+
         assert log_dict["id"] == "log-serial"
         assert log_dict["action"] == "batch_update"
         assert log_dict["spreadsheet_id"] == "sheet-999"
@@ -283,7 +281,7 @@ class TestFixSummaryModel:
             description="Replaced all VLOOKUP with XLOOKUP",
             spreadsheet_id="sheet-123",
         )
-        
+
         assert summary.id == "fix-123"
         assert summary.title == "Fixed VLOOKUP formulas"
         assert summary.description == "Replaced all VLOOKUP with XLOOKUP"
@@ -298,7 +296,7 @@ class TestFixSummaryModel:
     def test_fix_summary_with_all_fields(self):
         """Test creating a FixSummary with all fields."""
         timestamp = datetime(2024, 1, 15, 10, 30, 0)
-        
+
         summary = FixSummary(
             id="fix-456",
             title="Complete Fix",
@@ -311,7 +309,7 @@ class TestFixSummaryModel:
             after_example="=XLOOKUP(A1, B:B, C:C)",
             tags=["vlookup", "xlookup", "upgrade"],
         )
-        
+
         assert summary.timestamp == timestamp
         assert summary.pattern_searched == "VLOOKUP.*"
         assert summary.cells_modified == 15
@@ -330,7 +328,7 @@ class TestFixSummaryModel:
             spreadsheet_id="sheet-time",
         )
         after = datetime.utcnow()
-        
+
         assert before <= summary.timestamp <= after
 
     def test_fix_summary_serialization(self):
@@ -343,9 +341,9 @@ class TestFixSummaryModel:
             cells_modified=5,
             tags=["test"],
         )
-        
+
         summary_dict = summary.model_dump()
-        
+
         assert summary_dict["id"] == "fix-serial"
         assert summary_dict["title"] == "Serial Fix"
         assert summary_dict["spreadsheet_id"] == "sheet-serial"
