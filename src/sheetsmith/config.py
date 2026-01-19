@@ -10,6 +10,14 @@ from pydantic import BaseModel
 load_dotenv()
 
 
+def _parse_cors_origins() -> list[str]:
+    """Parse CORS origins from environment variable."""
+    cors_env = os.getenv("CORS_ALLOW_ORIGINS")
+    if cors_env:
+        return cors_env.split(",")
+    return ["*"]
+
+
 class Settings(BaseModel):
     """Application settings."""
 
@@ -36,11 +44,7 @@ class Settings(BaseModel):
     debug: bool = os.getenv("DEBUG", "false").lower() == "true"
 
     # CORS settings
-    cors_allow_origins: list[str] = (
-        os.getenv("CORS_ALLOW_ORIGINS", "*").split(",")
-        if os.getenv("CORS_ALLOW_ORIGINS")
-        else ["*"]
-    )
+    cors_allow_origins: list[str] = _parse_cors_origins()
 
     # Agent settings
     model_name: str = os.getenv("MODEL_NAME", "claude-sonnet-4-20250514")

@@ -1,5 +1,6 @@
 """OpenRouter LLM client."""
 
+import json
 import httpx
 
 from .base import LLMClient, LLMResponse
@@ -175,8 +176,6 @@ class OpenRouterClient(LLMClient):
         # Add tool calls if present
         if message.get("tool_calls"):
             for tool_call in message["tool_calls"]:
-                import json
-
                 content.append(
                     {
                         "type": "tool_use",
