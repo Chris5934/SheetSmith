@@ -3,13 +3,12 @@
 import json
 from typing import Any, Optional
 
-from anthropic import Anthropic
-
 from ..config import settings
 from ..sheets import GoogleSheetsClient
 from ..memory import MemoryStore
 from ..tools import ToolRegistry, GSheetsTools, MemoryTools
 from ..engine import PatchEngine, FormulaDiffer
+from ..llm import AnthropicClient, OpenRouterClient, LLMClient
 from .prompts import SYSTEM_PROMPT
 
 
@@ -34,11 +33,23 @@ class SheetSmithAgent:
         # Add patch tools
         self._register_patch_tools()
 
-        # Initialize Anthropic client
-        self.client = Anthropic(api_key=settings.anthropic_api_key)
+        # Initialize LLM client based on provider
+        self.client = self._create_llm_client()
 
         # Conversation history
         self.messages: list[dict] = []
+
+    def _create_llm_client(self) -> LLMClient:
+        """Create the appropriate LLM client based on configuration."""
+        if settings.llm_provider == "openrouter":
+            if not settings.openrouter_api_key:
+                raise ValueError("OPENROUTER_API_KEY is required when LLM_PROVIDER is 'openrouter'")
+            return OpenRouterClient(api_key=settings.openrouter_api_key)
+        else:
+            # Default to Anthropic
+            if not settings.anthropic_api_key:
+                raise ValueError("ANTHROPIC_API_KEY is required when LLM_PROVIDER is 'anthropic'")
+            return AnthropicClient(api_key=settings.anthropic_api_key)
 
     def _register_patch_tools(self):
         """Register patch-related tools."""
@@ -86,9 +97,7 @@ class SheetSmithAgent:
             )
         )
 
-    def _preview_patch(
-        self, spreadsheet_id: str, description: str, changes: list[dict]
-    ) -> dict:
+    def _preview_patch(self, spreadsheet_id: str, description: str, changes: list[dict]) -> dict:
         """Generate a patch preview."""
         patch = self.patch_engine.create_patch(
             spreadsheet_id=spreadsheet_id,
@@ -120,9 +129,16 @@ class SheetSmithAgent:
         """Process a user message and return the agent's response."""
         self.messages.append({"role": "user", "content": user_message})
 
-        # Call Claude with tools
-        response = self.client.messages.create(
-            model=settings.model_name,
+        # Determine the model to use
+        model = (
+            settings.openrouter_model
+            if settings.llm_provider == "openrouter"
+            else settings.model_name
+        )
+
+        # Call LLM with tools
+        response = self.client.create_message(
+            model=model,
             max_tokens=settings.max_tokens,
             system=SYSTEM_PROMPT,
             tools=self.registry.to_anthropic_tools(),
@@ -133,30 +149,50 @@ class SheetSmithAgent:
         return await self._process_response(response)
 
     async def _process_response(self, response) -> str:
-        """Process Claude's response, handling any tool calls."""
+        """Process LLM response, handling any tool calls."""
         assistant_content = []
         final_text = ""
 
         for block in response.content:
-            if block.type == "text":
-                final_text += block.text
+            # Handle both dict and object types
+            block_type = (
+                block.get("type") if isinstance(block, dict) else getattr(block, "type", None)
+            )
+
+            if block_type == "text":
+                text = block.get("text") if isinstance(block, dict) else getattr(block, "text", "")
+                final_text += text
                 assistant_content.append(block)
-            elif block.type == "tool_use":
+            elif block_type == "tool_use":
                 assistant_content.append(block)
 
         # Add assistant message to history
         self.messages.append({"role": "assistant", "content": assistant_content})
 
         # Handle tool calls
-        tool_calls = [b for b in response.content if b.type == "tool_use"]
+        tool_calls = [
+            b
+            for b in response.content
+            if (b.get("type") if isinstance(b, dict) else getattr(b, "type", None)) == "tool_use"
+        ]
         if tool_calls and response.stop_reason == "tool_use":
             tool_results = []
             for tool_call in tool_calls:
-                result = await self._execute_tool(tool_call.name, tool_call.input)
+                # Handle both dict and object types
+                if isinstance(tool_call, dict):
+                    name = tool_call["name"]
+                    input_data = tool_call["input"]
+                    tool_id = tool_call["id"]
+                else:
+                    name = tool_call.name
+                    input_data = tool_call.input
+                    tool_id = tool_call.id
+
+                result = await self._execute_tool(name, input_data)
                 tool_results.append(
                     {
                         "type": "tool_result",
-                        "tool_use_id": tool_call.id,
+                        "tool_use_id": tool_id,
                         "content": json.dumps(result, default=str),
                     }
                 )
@@ -164,9 +200,16 @@ class SheetSmithAgent:
             # Add tool results to messages
             self.messages.append({"role": "user", "content": tool_results})
 
+            # Determine the model to use
+            model = (
+                settings.openrouter_model
+                if settings.llm_provider == "openrouter"
+                else settings.model_name
+            )
+
             # Continue conversation
-            continuation = self.client.messages.create(
-                model=settings.model_name,
+            continuation = self.client.create_message(
+                model=model,
                 max_tokens=settings.max_tokens,
                 system=SYSTEM_PROMPT,
                 tools=self.registry.to_anthropic_tools(),

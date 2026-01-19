@@ -44,9 +44,7 @@ class PatchPreview:
             old_lines = diff.old_formula.split("\n") if diff.old_formula else [""]
             new_lines = diff.new_formula.split("\n") if diff.new_formula else [""]
 
-            for line in difflib.unified_diff(
-                old_lines, new_lines, lineterm="", n=0
-            ):
+            for line in difflib.unified_diff(old_lines, new_lines, lineterm="", n=0):
                 if line.startswith("---") or line.startswith("+++"):
                     continue
                 if line.startswith("@@"):

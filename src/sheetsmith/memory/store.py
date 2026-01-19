@@ -24,8 +24,7 @@ class MemoryStore:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._connection = await aiosqlite.connect(str(self.db_path))
 
-        await self._connection.executescript(
-            """
+        await self._connection.executescript("""
             CREATE TABLE IF NOT EXISTS rules (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -79,8 +78,7 @@ class MemoryStore:
             CREATE INDEX IF NOT EXISTS idx_logic_blocks_type ON logic_blocks(block_type);
             CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
             CREATE INDEX IF NOT EXISTS idx_fix_summaries_spreadsheet ON fix_summaries(spreadsheet_id);
-            """
-        )
+            """)
         await self._connection.commit()
 
     async def close(self):
@@ -149,9 +147,7 @@ class MemoryStore:
 
     async def delete_rule(self, rule_id: str) -> bool:
         """Delete a rule by ID."""
-        cursor = await self._connection.execute(
-            "DELETE FROM rules WHERE id = ?", (rule_id,)
-        )
+        cursor = await self._connection.execute("DELETE FROM rules WHERE id = ?", (rule_id,))
         await self._connection.commit()
         return cursor.rowcount > 0
 

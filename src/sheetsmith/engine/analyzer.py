@@ -2,7 +2,6 @@
 
 import re
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -106,9 +105,7 @@ class FormulaAnalyzer:
     def __init__(self):
         self.known_patterns: list[dict] = []
 
-    def register_pattern(
-        self, name: str, pattern: str, description: str, category: str = "custom"
-    ):
+    def register_pattern(self, name: str, pattern: str, description: str, category: str = "custom"):
         """Register a known formula pattern for identification."""
         self.known_patterns.append(
             {
@@ -280,9 +277,7 @@ class FormulaAnalyzer:
 
         return mappings
 
-    def extract_shared_logic(
-        self, formulas: list[str], min_occurrences: int = 2
-    ) -> list[dict]:
+    def extract_shared_logic(self, formulas: list[str], min_occurrences: int = 2) -> list[dict]:
         """Identify shared logic patterns across multiple formulas."""
         # Find common substrings that appear in multiple formulas
         shared_patterns = []

@@ -13,7 +13,6 @@ from ..agent import SheetSmithAgent
 from ..config import settings
 from .routes import router
 
-
 # Global agent instance
 _agent: Optional[SheetSmithAgent] = None
 
@@ -49,7 +48,7 @@ def create_app() -> FastAPI:
     # CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=settings.cors_allow_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

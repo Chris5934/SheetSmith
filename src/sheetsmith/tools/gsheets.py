@@ -27,9 +27,7 @@ class GSheetsTools:
             range_notation: str,
             include_formulas: bool = True,
         ) -> dict:
-            result = self.client.read_range(
-                spreadsheet_id, range_notation, include_formulas
-            )
+            result = self.client.read_range(spreadsheet_id, range_notation, include_formulas)
             return {
                 "spreadsheet_id": result.spreadsheet_id,
                 "sheet_name": result.sheet_name,

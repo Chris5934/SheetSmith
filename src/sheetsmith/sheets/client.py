@@ -1,7 +1,7 @@
 """Google Sheets API client."""
 
 import re
-from typing import Any, Optional
+from typing import Optional
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -61,9 +61,7 @@ class GoogleSheetsClient:
         creds = None
 
         if settings.google_token_path.exists():
-            creds = Credentials.from_authorized_user_file(
-                str(settings.google_token_path), SCOPES
-            )
+            creds = Credentials.from_authorized_user_file(str(settings.google_token_path), SCOPES)
 
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
@@ -97,11 +95,7 @@ class GoogleSheetsClient:
     def get_spreadsheet_info(self, spreadsheet_id: str) -> dict:
         """Get basic information about a spreadsheet."""
         try:
-            result = (
-                self.service.spreadsheets()
-                .get(spreadsheetId=spreadsheet_id)
-                .execute()
-            )
+            result = self.service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
             return {
                 "id": result["spreadsheetId"],
                 "title": result["properties"]["title"],
@@ -110,9 +104,7 @@ class GoogleSheetsClient:
                         "id": sheet["properties"]["sheetId"],
                         "title": sheet["properties"]["title"],
                         "row_count": sheet["properties"]["gridProperties"]["rowCount"],
-                        "col_count": sheet["properties"]["gridProperties"][
-                            "columnCount"
-                        ],
+                        "col_count": sheet["properties"]["gridProperties"]["columnCount"],
                     }
                     for sheet in result.get("sheets", [])
                 ],
@@ -227,9 +219,7 @@ class GoogleSheetsClient:
             range_notation = f"'{sheet['title']}'!A1:{index_to_col_letter(sheet['col_count'] - 1)}{sheet['row_count']}"
 
             try:
-                sheet_data = self.read_range(
-                    spreadsheet_id, range_notation, include_formulas=True
-                )
+                sheet_data = self.read_range(spreadsheet_id, range_notation, include_formulas=True)
             except Exception:
                 continue
 
