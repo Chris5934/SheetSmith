@@ -35,9 +35,7 @@ def main():
     )
 
     # Auth command
-    auth_parser = subparsers.add_parser(
-        "auth", help="Authenticate with Google Sheets API"
-    )
+    subparsers.add_parser("auth", help="Authenticate with Google Sheets API")
 
     args = parser.parse_args()
 

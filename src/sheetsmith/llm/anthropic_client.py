@@ -1,6 +1,5 @@
 """Anthropic LLM client."""
 
-from typing import Any
 from anthropic import Anthropic
 
 from .base import LLMClient, LLMResponse
@@ -28,12 +27,12 @@ class AnthropicClient(LLMClient):
             tools=tools,
             messages=messages,
         )
-        
+
         return LLMResponse(
             content=response.content,
             stop_reason=response.stop_reason,
             usage={
                 "input_tokens": response.usage.input_tokens,
                 "output_tokens": response.usage.output_tokens,
-            }
+            },
         )

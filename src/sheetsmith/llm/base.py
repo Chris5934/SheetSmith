@@ -8,6 +8,7 @@ from dataclasses import dataclass
 @dataclass
 class LLMMessage:
     """Message in a conversation."""
+
     role: str
     content: Any
 
@@ -15,6 +16,7 @@ class LLMMessage:
 @dataclass
 class LLMResponse:
     """Response from LLM."""
+
     content: list[Any]
     stop_reason: str
     usage: Optional[dict] = None

@@ -6,7 +6,6 @@ from fastapi import APIRouter, HTTPException
 
 from .app import get_agent
 
-
 router = APIRouter()
 
 
@@ -292,7 +291,7 @@ async def list_audit_logs(spreadsheet_id: Optional[str] = None, limit: int = 50)
 async def health_check():
     """Health check endpoint with diagnostics."""
     from ..config import settings
-    
+
     # Gather non-secret diagnostics
     diagnostics = {
         "status": "ok",
@@ -303,7 +302,7 @@ async def health_check():
             "anthropic_key_present": bool(settings.anthropic_api_key),
             "openrouter_key_present": bool(settings.openrouter_api_key),
             "google_credentials_configured": settings.google_credentials_path.exists(),
-        }
+        },
     }
-    
+
     return diagnostics

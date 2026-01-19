@@ -139,7 +139,7 @@ class PatchEngine:
         return {
             "success": True,
             "patch_id": patch.id,
-            "message": f"Patch rejected" + (f": {reason}" if reason else ""),
+            "message": "Patch rejected" + (f": {reason}" if reason else ""),
         }
 
     def generate_value_replacement_patch(

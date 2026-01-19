@@ -13,7 +13,6 @@ from ..agent import SheetSmithAgent
 from ..config import settings
 from .routes import router
 
-
 # Global agent instance
 _agent: Optional[SheetSmithAgent] = None
 

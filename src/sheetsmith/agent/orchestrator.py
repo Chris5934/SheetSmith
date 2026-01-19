@@ -97,9 +97,7 @@ class SheetSmithAgent:
             )
         )
 
-    def _preview_patch(
-        self, spreadsheet_id: str, description: str, changes: list[dict]
-    ) -> dict:
+    def _preview_patch(self, spreadsheet_id: str, description: str, changes: list[dict]) -> dict:
         """Generate a patch preview."""
         patch = self.patch_engine.create_patch(
             spreadsheet_id=spreadsheet_id,
@@ -133,8 +131,8 @@ class SheetSmithAgent:
 
         # Determine the model to use
         model = (
-            settings.openrouter_model 
-            if settings.llm_provider == "openrouter" 
+            settings.openrouter_model
+            if settings.llm_provider == "openrouter"
             else settings.model_name
         )
 
@@ -157,8 +155,10 @@ class SheetSmithAgent:
 
         for block in response.content:
             # Handle both dict and object types
-            block_type = block.get("type") if isinstance(block, dict) else getattr(block, "type", None)
-            
+            block_type = (
+                block.get("type") if isinstance(block, dict) else getattr(block, "type", None)
+            )
+
             if block_type == "text":
                 text = block.get("text") if isinstance(block, dict) else getattr(block, "text", "")
                 final_text += text
@@ -171,7 +171,8 @@ class SheetSmithAgent:
 
         # Handle tool calls
         tool_calls = [
-            b for b in response.content 
+            b
+            for b in response.content
             if (b.get("type") if isinstance(b, dict) else getattr(b, "type", None)) == "tool_use"
         ]
         if tool_calls and response.stop_reason == "tool_use":
@@ -186,7 +187,7 @@ class SheetSmithAgent:
                     name = tool_call.name
                     input_data = tool_call.input
                     tool_id = tool_call.id
-                    
+
                 result = await self._execute_tool(name, input_data)
                 tool_results.append(
                     {
@@ -201,8 +202,8 @@ class SheetSmithAgent:
 
             # Determine the model to use
             model = (
-                settings.openrouter_model 
-                if settings.llm_provider == "openrouter" 
+                settings.openrouter_model
+                if settings.llm_provider == "openrouter"
                 else settings.model_name
             )
 
