@@ -4,9 +4,14 @@ from typing import Optional
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException
 
-from .app import get_agent
-
 router = APIRouter()
+
+
+def get_agent():
+    """Get the global agent instance."""
+    from .app import get_agent as _get_agent
+
+    return _get_agent()
 
 
 class ChatRequest(BaseModel):
