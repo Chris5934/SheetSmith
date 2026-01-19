@@ -19,8 +19,15 @@ class Settings(BaseModel):
     )
     google_token_path: Path = Path(os.getenv("GOOGLE_TOKEN_PATH", "token.json"))
 
+    # LLM Provider settings
+    llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")
+    
     # Anthropic API
     anthropic_api_key: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
+    
+    # OpenRouter API
+    openrouter_api_key: Optional[str] = os.getenv("OPENROUTER_API_KEY")
+    openrouter_model: str = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
 
     # Database
     database_path: Path = Path(os.getenv("DATABASE_PATH", "data/sheetsmith.db"))
@@ -29,6 +36,12 @@ class Settings(BaseModel):
     host: str = os.getenv("HOST", "127.0.0.1")
     port: int = int(os.getenv("PORT", "8000"))
     debug: bool = os.getenv("DEBUG", "false").lower() == "true"
+    
+    # CORS settings
+    cors_allow_origins: list[str] = (
+        os.getenv("CORS_ALLOW_ORIGINS", "*").split(",") 
+        if os.getenv("CORS_ALLOW_ORIGINS") else ["*"]
+    )
 
     # Agent settings
     model_name: str = os.getenv("MODEL_NAME", "claude-sonnet-4-20250514")

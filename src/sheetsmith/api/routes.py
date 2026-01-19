@@ -290,5 +290,20 @@ async def list_audit_logs(spreadsheet_id: Optional[str] = None, limit: int = 50)
 
 @router.get("/health")
 async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy", "service": "sheetsmith"}
+    """Health check endpoint with diagnostics."""
+    from ..config import settings
+    
+    # Gather non-secret diagnostics
+    diagnostics = {
+        "status": "ok",
+        "service": "sheetsmith",
+        "config": {
+            "llm_provider": settings.llm_provider,
+            "model_name": settings.model_name,
+            "anthropic_key_present": bool(settings.anthropic_api_key),
+            "openrouter_key_present": bool(settings.openrouter_api_key),
+            "google_credentials_configured": settings.google_credentials_path.exists(),
+        }
+    }
+    
+    return diagnostics
