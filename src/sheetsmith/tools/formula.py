@@ -4,6 +4,7 @@ from typing import Optional
 
 from ..sheets import GoogleSheetsClient
 from ..engine import DeterministicReplacer, ReplacementPlan
+from ..engine.safety import SafetyValidator
 from .registry import Tool, ToolParameter, ToolRegistry
 
 
@@ -53,6 +54,13 @@ class FormulaTools:
                 description=description,
             )
 
+            # Add safety validation to response
+            validator = SafetyValidator()
+            is_safe, violations = validator.validate_operation(
+                cells_affected=result.cells_updated if not dry_run else result.matches_found,
+                sheets_affected=len(result.affected_sheets),
+            )
+
             return {
                 "success": result.success,
                 "matches_found": result.matches_found,
@@ -61,6 +69,19 @@ class FormulaTools:
                 "preview": result.preview,
                 "error": result.error,
                 "execution_path": result.execution_path,
+                "safety_status": {
+                    "is_safe": is_safe,
+                    "violations": [
+                        {
+                            "constraint": v.constraint,
+                            "current": v.current_value,
+                            "max": v.max_value,
+                            "message": v.message
+                        }
+                        for v in violations
+                    ],
+                    "requires_preview": validator.requires_preview(result.matches_found)
+                },
                 "message": (
                     f"{'Preview:' if dry_run else 'Updated'} {result.cells_updated} cells "
                     f"across {len(result.affected_sheets)} sheet(s)"

@@ -7,6 +7,7 @@ from typing import Optional
 
 from ..sheets import GoogleSheetsClient, BatchUpdate
 from ..sheets.models import FormulaMatch
+from .safety import SafetyValidator
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,31 @@ class DeterministicReplacer:
                 )
 
             logger.info(f"Found {len(matches)} matching formulas")
+
+            # Safety validation
+            validator = SafetyValidator()
+            is_safe, violations = validator.validate_operation(
+                cells_affected=len(matches),
+                sheets_affected=len(set(m.sheet_name for m in matches)),
+            )
+
+            if not is_safe:
+                violation_msgs = [v.message for v in violations]
+                return ReplacementResult(
+                    success=False,
+                    matches_found=len(matches),
+                    cells_updated=0,
+                    affected_sheets=[],
+                    error=f"Safety constraints violated: {'; '.join(violation_msgs)}",
+                    execution_path="deterministic"
+                )
+
+            # Check if preview is required
+            if validator.requires_preview(len(matches)) and not plan.dry_run:
+                logger.warning(
+                    f"Operation affects {len(matches)} cells, which exceeds the preview threshold. "
+                    f"Consider running with dry_run=true first."
+                )
 
             # Step 2: Generate replacements
             replacements = self._generate_replacements(matches, plan)
