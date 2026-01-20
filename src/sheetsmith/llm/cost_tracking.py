@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 @dataclass
@@ -82,7 +82,7 @@ class LLMCallLogger:
             The created LLMCallRecord
         """
         record = LLMCallRecord(
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             operation=operation,
             model=model,
             provider=provider,
