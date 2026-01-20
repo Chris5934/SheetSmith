@@ -315,30 +315,33 @@ class DeterministicReplacer:
         
         Returns None if the request cannot be parsed as a simple replacement.
         """
-        request_lower = request.lower()
-
         # Try to extract pattern: "replace X with Y" or "change X to Y"
+        # Use non-greedy matching and better boundaries to avoid capturing too much
         patterns = [
-            r"replace\s+['\"]?(.+?)['\"]?\s+(?:with|to)\s+['\"]?(.+?)['\"]?(?:\s+in\s+(.+))?(?:\s|$)",
-            r"change\s+(?:all\s+)?['\"]?(.+?)['\"]?\s+(?:with|to)\s+['\"]?(.+?)['\"]?(?:\s+in\s+(.+))?(?:\s|$)",
-            r"update\s+['\"]?(.+?)['\"]?\s+to\s+['\"]?(.+?)['\"]?(?:\s+in\s+(.+))?(?:\s|$)",
-            r"swap\s+['\"]?(.+?)['\"]?\s+(?:with|for)\s+['\"]?(.+?)['\"]?(?:\s+in\s+(.+))?(?:\s|$)",
+            r"(?i)replace\s+['\"]?([^'\"]+?)['\"]?\s+(?:with|to)\s+['\"]?([^'\"]+?)['\"]?(?:\s+in\s+(.+?))?(?:\s*$)",
+            r"(?i)change\s+(?:all\s+)?['\"]?([^'\"]+?)['\"]?\s+(?:with|to)\s+['\"]?([^'\"]+?)['\"]?(?:\s+in\s+(.+?))?(?:\s*$)",
+            r"(?i)update\s+['\"]?([^'\"]+?)['\"]?\s+to\s+['\"]?([^'\"]+?)['\"]?(?:\s+in\s+(.+?))?(?:\s*$)",
+            r"(?i)swap\s+['\"]?([^'\"]+?)['\"]?\s+(?:with|for)\s+['\"]?([^'\"]+?)['\"]?(?:\s+in\s+(.+?))?(?:\s*$)",
         ]
 
         for pattern in patterns:
-            match = re.search(pattern, request_lower, re.IGNORECASE)
+            match = re.search(pattern, request)
             if match:
+                # Preserve original case
                 search_term = match.group(1).strip().strip("'\"")
                 replace_term = match.group(2).strip().strip("'\"")
                 target = match.group(3).strip() if match.group(3) else None
 
-                # Parse target sheets
+                # Parse target sheets - look for "SheetX" pattern, not just numbers
                 target_sheets = None
                 if target:
-                    # Extract sheet names from patterns like "in Sheet1" or "in Sheet1 and Sheet2"
-                    sheets = re.findall(r"sheet\s*'?([^',\s]+)'?", target, re.IGNORECASE)
+                    # Extract sheet names: look for word after "sheet" or quoted names
+                    sheets = re.findall(r"(?:sheet\s+)?([A-Za-z][A-Za-z0-9]*)", target, re.IGNORECASE)
                     if sheets:
-                        target_sheets = sheets
+                        # Filter out common words like "and", "in"
+                        sheets = [s for s in sheets if s.lower() not in ('and', 'in', 'or', 'sheet')]
+                        if sheets:
+                            target_sheets = sheets
 
                 return ReplacementPlan(
                     action="replace",
