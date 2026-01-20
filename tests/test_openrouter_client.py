@@ -1,6 +1,7 @@
 """Tests for OpenRouter client."""
 
 import json
+import pytest
 from unittest.mock import Mock
 
 from sheetsmith.llm.openrouter_client import OpenRouterClient
@@ -388,8 +389,5 @@ class TestOpenRouterClient:
             }
         ]
 
-        try:
+        with pytest.raises(ValueError, match="must have a 'name' field"):
             client._convert_tools(tools_without_name)
-            assert False, "Expected ValueError to be raised"
-        except ValueError as e:
-            assert "must have a 'name' field" in str(e)

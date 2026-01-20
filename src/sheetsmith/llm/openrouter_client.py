@@ -1,5 +1,6 @@
 """OpenRouter LLM client."""
 
+import copy
 import json
 import httpx
 
@@ -190,8 +191,7 @@ class OpenRouterClient(LLMClient):
         if not schema or "properties" not in schema:
             return schema
         
-        # Create a copy to preserve all top-level schema fields
-        import copy
+        # Create a deep copy to preserve all top-level schema fields
         fixed_schema = copy.deepcopy(schema)
         
         # Fix array parameters by adding items field
