@@ -6,7 +6,7 @@ from typing import Any, Optional
 from ..config import settings
 from ..sheets import GoogleSheetsClient
 from ..memory import MemoryStore
-from ..tools import ToolRegistry, GSheetsTools, MemoryTools
+from ..tools import ToolRegistry, GSheetsTools, MemoryTools, FormulaTools
 from ..engine import PatchEngine, FormulaDiffer
 from ..llm import AnthropicClient, OpenRouterClient, LLMClient
 from .prompts import SYSTEM_PROMPT
@@ -29,6 +29,7 @@ class SheetSmithAgent:
         self.registry = ToolRegistry()
         GSheetsTools(self.sheets_client).register(self.registry)
         MemoryTools(self.memory_store).register(self.registry)
+        FormulaTools(self.sheets_client).register(self.registry)  # New formula tools
 
         # Add patch tools
         self._register_patch_tools()

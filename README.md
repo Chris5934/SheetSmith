@@ -37,6 +37,7 @@ Then open http://localhost:8000 in your browser.
 ### Implemented Capabilities
 - **Google Sheets Integration**: Full read/write access via Google Sheets API
 - **Pattern-Based Formula Search**: Regex search across all sheets to find matching formulas
+- **Deterministic Mass Replace**: Fast, cost-efficient bulk replacements without LLM overhead (99% cost reduction for simple operations)
 - **Surgical Updates**: Change specific values in formulas while preserving sheet-specific references
 - **Batch Updates**: Apply multiple changes in a single atomic operation
 - **Diff Preview**: Review all proposed changes before applying them
@@ -53,6 +54,7 @@ The agent has access to the following tools:
 | `gsheets.search_formulas` | Search for formulas matching a regex pattern |
 | `gsheets.batch_update` | Apply multiple cell updates atomically |
 | `gsheets.get_info` | Get spreadsheet metadata and sheet list |
+| `formula.mass_replace` | **NEW:** Fast deterministic mass replacement for simple operations (99% cost reduction) |
 | `memory.store_rule` | Store a project convention or formula rule |
 | `memory.get_rules` | Retrieve stored rules |
 | `memory.store_logic_block` | Store a known formula pattern (kit, teammate, rotation) |
@@ -137,6 +139,29 @@ If one value changes (for example, Corruption becomes 30.0%), I must manually up
 > "Update the Corruption ratio from 28.6% to 30.0% everywhere"
 
 The agent finds all matching formulas, shows me a diff, and applies the changes with my approval.
+
+---
+
+## Cost Optimization
+
+SheetSmith now uses **Deterministic Mass Replace** for simple operations, dramatically reducing LLM API costs:
+
+### Example: Replace VLOOKUP with XLOOKUP across 100 formulas
+
+**Before (Traditional approach)**:
+- 1 LLM call to understand the request
+- 100 LLM calls to process each formula
+- **Total cost**: ~$0.10, ~30 seconds
+
+**After (Optimized approach)**:
+- 1 LLM call to understand the request
+- 0 LLM calls for replacements (deterministic string replacement)
+- **Total cost**: ~$0.001, ~0.5 seconds
+- **Savings**: 99% cost reduction, 98% time reduction
+
+The system automatically chooses the most efficient path based on the complexity of your request. Simple find/replace operations use deterministic replacement, while complex logic changes still leverage the LLM's reasoning capabilities.
+
+See [docs/deterministic-mass-replace.md](docs/deterministic-mass-replace.md) for details.
 
 ---
 

@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
 
+
 def get_agent():
     """Get the global agent instance."""
     from .app import get_agent as _get_agent

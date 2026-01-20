@@ -190,9 +190,7 @@ class TestOpenRouterClient:
                 "description": "Store a rule",
                 "input_schema": {
                     "type": "object",
-                    "properties": {
-                        "name": {"type": "string", "description": "Rule name"}
-                    },
+                    "properties": {"name": {"type": "string", "description": "Rule name"}},
                     "required": ["name"],
                 },
             },
@@ -203,7 +201,7 @@ class TestOpenRouterClient:
         assert len(result) == 2
         assert result[0]["function"]["name"] == "gsheets_read_range"
         assert result[1]["function"]["name"] == "memory_store_rule"
-        
+
         # Verify mapping is stored
         assert client._tool_name_map["gsheets_read_range"] == "gsheets.read_range"
         assert client._tool_name_map["memory_store_rule"] == "memory.store_rule"
@@ -241,13 +239,13 @@ class TestOpenRouterClient:
 
         assert len(result) == 1
         params = result[0]["function"]["parameters"]
-        
+
         # Verify array parameters have items field
         assert "items" in params["properties"]["sheet_names"]
         assert params["properties"]["sheet_names"]["items"] == {"type": "string"}
         assert "items" in params["properties"]["tags"]
         assert params["properties"]["tags"]["items"] == {"type": "string"}
-        
+
         # Verify non-array parameters are unchanged
         assert "items" not in params["properties"]["count"]
 
@@ -330,7 +328,7 @@ class TestOpenRouterClient:
 
         assert msg_with_tools is not None
         assert len(msg_with_tools["tool_calls"]) == 1
-        
+
         # Verify name was converted to underscore notation
         tool_call = msg_with_tools["tool_calls"][0]
         assert tool_call["function"]["name"] == "gsheets_read_range"
