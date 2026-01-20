@@ -90,8 +90,8 @@ class TestOpenRouterClient:
         # Verify it's valid JSON
         parsed_args = json.loads(arguments_str)
         assert parsed_args == {"cell": "A1", "value": "New Value", "sheet_id": 123}
-        # Verify it's not Python str() format
-        assert "'" not in arguments_str  # JSON uses double quotes
+        # Verify it's not Python str() format (which would start with "{'")
+        assert not arguments_str.lstrip().startswith("{'")
 
     def test_convert_messages_with_empty_input_json_serialization(self):
         """Test that empty input is properly JSON serialized as {}."""
