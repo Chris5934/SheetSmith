@@ -1,12 +1,9 @@
 """Tests for OpenRouter client."""
 
 import json
-from unittest.mock import Mock, patch
-
-import pytest
+from unittest.mock import Mock
 
 from sheetsmith.llm.openrouter_client import OpenRouterClient
-from sheetsmith.llm.base import LLMResponse
 
 
 class TestOpenRouterClient:
