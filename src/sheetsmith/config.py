@@ -50,5 +50,14 @@ class Settings(BaseModel):
     model_name: str = os.getenv("MODEL_NAME", "claude-sonnet-4-20250514")
     max_tokens: int = int(os.getenv("MAX_TOKENS", "4096"))
 
+    # Safety constraints
+    max_cells_per_operation: int = int(os.getenv("MAX_CELLS_PER_OPERATION", "500"))
+    max_sheets_per_operation: int = int(os.getenv("MAX_SHEETS_PER_OPERATION", "40"))
+    max_formula_length: int = int(os.getenv("MAX_FORMULA_LENGTH", "50000"))
+    require_preview_above_cells: int = int(os.getenv("REQUIRE_PREVIEW_ABOVE_CELLS", "10"))
+
+    # Model selection for different operations
+    planning_model: str = os.getenv("PLANNING_MODEL", "")  # Empty means use main model
+
 
 settings = Settings()

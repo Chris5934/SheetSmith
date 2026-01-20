@@ -260,6 +260,11 @@ Environment variables (set in `.env`):
 | `DATABASE_PATH` | SQLite database location | `data/sheetsmith.db` |
 | `HOST` | Server host | `127.0.0.1` |
 | `PORT` | Server port | `8000` |
+| `MAX_CELLS_PER_OPERATION` | Maximum cells that can be modified in a single operation | `500` |
+| `MAX_SHEETS_PER_OPERATION` | Maximum sheets that can be modified in a single operation | `40` |
+| `MAX_FORMULA_LENGTH` | Maximum length of a formula (guard against corruption) | `50000` |
+| `REQUIRE_PREVIEW_ABOVE_CELLS` | Number of cells above which preview is required | `10` |
+| `PLANNING_MODEL` | Cheaper model for simple planning tasks (optional) | `` |
 
 ### Using OpenRouter
 
@@ -269,6 +274,32 @@ To use OpenRouter instead of direct Anthropic API:
 2. Set `OPENROUTER_API_KEY` to your OpenRouter API key
 3. Set `OPENROUTER_MODEL` to your desired model (e.g., `anthropic/claude-3.5-sonnet`, `openai/gpt-4`)
 4. You do NOT need to set `ANTHROPIC_API_KEY` or `MODEL_NAME` when using OpenRouter
+
+## Safety Features
+
+SheetSmith includes several safety constraints to prevent expensive or dangerous operations:
+
+### Automatic Limits
+- **Max cells per operation**: Operations affecting more than 500 cells (configurable) require explicit scoping
+- **Max sheets per operation**: Operations can't affect more than 40 sheets (configurable) in a single action
+- **Formula length guard**: Prevents accidentally creating or accepting malformed formulas
+- **Preview requirement**: Large operations automatically trigger preview mode
+
+### Scope Control
+When operations exceed safety limits, the agent will:
+1. Report the constraint violation
+2. Suggest narrowing the scope (specific sheets, columns, or patterns)
+3. Ask which subset to process
+4. Prevent execution until scope is narrowed
+
+### Example
+```
+User: "Replace SEED! with Base! everywhere"
+Agent: "I found 750 matches across 50 sheets, which exceeds the safety limit of 500 cells per operation.
+        Let's narrow the scope. Which sheets would you like me to update first?"
+```
+
+Configure limits in your `.env` file or use defaults.
 
 ---
 
