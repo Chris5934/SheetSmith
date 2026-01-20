@@ -156,6 +156,9 @@ class OpenRouterClient(LLMClient):
         for tool in anthropic_tools:
             # Replace dots with underscores for OpenRouter compatibility
             original_name = tool.get("name")
+            if not original_name:
+                raise ValueError("Tool must have a 'name' field")
+            
             converted_name = original_name.replace(".", "_")
             
             # Store mapping for reverse conversion
@@ -182,23 +185,22 @@ class OpenRouterClient(LLMClient):
         """Add 'items' field to array-type parameters in the schema.
         
         OpenRouter/OpenAI requires array parameters to specify their item type.
+        Defaults to string items for arrays without an items field.
         """
         if not schema or "properties" not in schema:
             return schema
         
-        # Create a copy to avoid modifying the original
-        fixed_schema = schema.copy()
-        fixed_schema["properties"] = {}
+        # Create a copy to preserve all top-level schema fields
+        import copy
+        fixed_schema = copy.deepcopy(schema)
         
-        for prop_name, prop_def in schema.get("properties", {}).items():
-            fixed_prop = prop_def.copy()
-            
+        # Fix array parameters by adding items field
+        for prop_name, prop_def in fixed_schema["properties"].items():
             # Add items field for array types if not present
-            if fixed_prop.get("type") == "array" and "items" not in fixed_prop:
-                # Default to string items if not specified
-                fixed_prop["items"] = {"type": "string"}
-            
-            fixed_schema["properties"][prop_name] = fixed_prop
+            if prop_def.get("type") == "array" and "items" not in prop_def:
+                # Default to string items - this is appropriate for most SheetSmith tools
+                # which use arrays for sheet names, tags, and similar string lists
+                prop_def["items"] = {"type": "string"}
         
         return fixed_schema
 

@@ -353,3 +353,43 @@ class TestOpenRouterClient:
 
         # Verify existing items field is preserved
         assert result["properties"]["updates"]["items"] == {"type": "object"}
+
+    def test_fix_array_parameters_preserves_other_schema_fields(self):
+        """Test that other schema fields like 'required' are preserved."""
+        client = OpenRouterClient(api_key="test-key")
+
+        schema = {
+            "type": "object",
+            "properties": {
+                "names": {
+                    "type": "array",
+                    "description": "List of names",
+                },
+            },
+            "required": ["names"],
+        }
+
+        result = client._fix_array_parameters(schema)
+
+        # Verify required field is preserved
+        assert "required" in result
+        assert result["required"] == ["names"]
+        # Verify items was added
+        assert result["properties"]["names"]["items"] == {"type": "string"}
+
+    def test_convert_tools_raises_error_on_missing_name(self):
+        """Test that converting tools without names raises an error."""
+        client = OpenRouterClient(api_key="test-key")
+
+        tools_without_name = [
+            {
+                "description": "A tool without a name",
+                "input_schema": {"type": "object", "properties": {}},
+            }
+        ]
+
+        try:
+            client._convert_tools(tools_without_name)
+            assert False, "Expected ValueError to be raised"
+        except ValueError as e:
+            assert "must have a 'name' field" in str(e)
