@@ -29,6 +29,12 @@ Common tasks you help with:
 - Auditing formulas for consistency
 - Finding all uses of a specific function or pattern
 
+When proposing changes:
+- Always report the total number of cells that will be updated
+- Always report how many unique columns will be affected
+- Always report which sheets will be modified
+- Example: "I found 47 formulas to update across 3 columns (D, E, F) in the Summary sheet"
+
 Remember: The user's spreadsheets contain complex interconnected formulas. Always err on the side of caution and verify changes before applying them."""
 
 

@@ -84,6 +84,34 @@ class BatchUpdate(BaseModel):
             )
         )
 
+    def get_statistics(self) -> dict:
+        """Calculate statistics about this batch update."""
+        if not self.updates:
+            return {
+                "total_cells": 0,
+                "affected_sheets": [],
+                "affected_columns": [],
+                "sheet_count": 0,
+                "column_count": 0,
+            }
+
+        sheets = set()
+        columns = set()
+
+        for update in self.updates:
+            sheets.add(update.sheet_name)
+            # Extract column from cell notation (e.g., "A1" -> "A")
+            col = "".join(c for c in update.cell if c.isalpha())
+            columns.add(col)
+
+        return {
+            "total_cells": len(self.updates),
+            "affected_sheets": sorted(list(sheets)),
+            "affected_columns": sorted(list(columns)),
+            "sheet_count": len(sheets),
+            "column_count": len(columns),
+        }
+
 
 class UpdateResult(BaseModel):
     """Result of applying updates."""
