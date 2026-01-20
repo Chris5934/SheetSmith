@@ -2,6 +2,7 @@
 
 from .gsheets import GSheetsTools
 from .memory import MemoryTools
+from .formula import FormulaTools
 from .registry import ToolRegistry, Tool
 
-__all__ = ["GSheetsTools", "MemoryTools", "ToolRegistry", "Tool"]
+__all__ = ["GSheetsTools", "MemoryTools", "FormulaTools", "ToolRegistry", "Tool"]
