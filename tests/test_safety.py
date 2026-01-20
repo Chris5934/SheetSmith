@@ -14,24 +14,24 @@ class TestSafetyValidator:
     def test_validate_operation_within_limits(self):
         """Test operation within all safety limits."""
         validator = SafetyValidator()
-        
+
         is_safe, violations = validator.validate_operation(
             cells_affected=10,
             sheets_affected=5,
         )
-        
+
         assert is_safe is True
         assert len(violations) == 0
 
     def test_validate_operation_exceeds_cells_limit(self):
         """Test operation exceeding max cells limit."""
         validator = SafetyValidator()
-        
+
         is_safe, violations = validator.validate_operation(
             cells_affected=1000,
             sheets_affected=5,
         )
-        
+
         assert is_safe is False
         assert len(violations) == 1
         assert violations[0].constraint == "max_cells_per_operation"
@@ -41,12 +41,12 @@ class TestSafetyValidator:
     def test_validate_operation_exceeds_sheets_limit(self):
         """Test operation exceeding max sheets limit."""
         validator = SafetyValidator()
-        
+
         is_safe, violations = validator.validate_operation(
             cells_affected=10,
             sheets_affected=50,
         )
-        
+
         assert is_safe is False
         assert len(violations) == 1
         assert violations[0].constraint == "max_sheets_per_operation"
@@ -56,13 +56,13 @@ class TestSafetyValidator:
     def test_validate_operation_exceeds_formula_length(self):
         """Test operation with formula exceeding max length."""
         validator = SafetyValidator()
-        
+
         is_safe, violations = validator.validate_operation(
             cells_affected=10,
             sheets_affected=5,
             max_formula_length=60000,
         )
-        
+
         assert is_safe is False
         assert len(violations) == 1
         assert violations[0].constraint == "max_formula_length"
@@ -72,13 +72,13 @@ class TestSafetyValidator:
     def test_validate_operation_multiple_violations(self):
         """Test operation with multiple constraint violations."""
         validator = SafetyValidator()
-        
+
         is_safe, violations = validator.validate_operation(
             cells_affected=1000,
             sheets_affected=50,
             max_formula_length=60000,
         )
-        
+
         assert is_safe is False
         assert len(violations) == 3
         constraints = [v.constraint for v in violations]
@@ -89,14 +89,14 @@ class TestSafetyValidator:
     def test_requires_preview_below_threshold(self):
         """Test preview not required below threshold."""
         validator = SafetyValidator()
-        
+
         assert validator.requires_preview(5) is False
         assert validator.requires_preview(10) is False
 
     def test_requires_preview_above_threshold(self):
         """Test preview required above threshold."""
         validator = SafetyValidator()
-        
+
         assert validator.requires_preview(11) is True
         assert validator.requires_preview(100) is True
 
