@@ -227,11 +227,23 @@ Environment variables (set in `.env`):
 |----------|-------------|---------|
 | `GOOGLE_CREDENTIALS_PATH` | Path to Google OAuth credentials | `credentials.json` |
 | `GOOGLE_TOKEN_PATH` | Path to store OAuth token | `token.json` |
-| `ANTHROPIC_API_KEY` | Your Anthropic API key | Required |
+| `LLM_PROVIDER` | LLM provider to use (`anthropic` or `openrouter`) | `anthropic` |
+| `ANTHROPIC_API_KEY` | Your Anthropic API key (required when using `anthropic` provider) | Required for Anthropic |
+| `MODEL_NAME` | Claude model to use with Anthropic | `claude-sonnet-4-20250514` |
+| `OPENROUTER_API_KEY` | Your OpenRouter API key (required when using `openrouter` provider) | Required for OpenRouter |
+| `OPENROUTER_MODEL` | Model to use with OpenRouter (e.g., `anthropic/claude-3.5-sonnet`) | `anthropic/claude-3.5-sonnet` |
 | `DATABASE_PATH` | SQLite database location | `data/sheetsmith.db` |
 | `HOST` | Server host | `127.0.0.1` |
 | `PORT` | Server port | `8000` |
-| `MODEL_NAME` | Claude model to use | `claude-sonnet-4-20250514` |
+
+### Using OpenRouter
+
+To use OpenRouter instead of direct Anthropic API:
+
+1. Set `LLM_PROVIDER=openrouter` in your `.env` file
+2. Set `OPENROUTER_API_KEY` to your OpenRouter API key
+3. Set `OPENROUTER_MODEL` to your desired model (e.g., `anthropic/claude-3.5-sonnet`, `openai/gpt-4`)
+4. You do NOT need to set `ANTHROPIC_API_KEY` or `MODEL_NAME` when using OpenRouter
 
 ---
 

@@ -98,7 +98,8 @@ class TestHealthEndpoint:
         mock_path.exists = Mock(return_value=True)
 
         mock_settings.llm_provider = "openrouter"
-        mock_settings.model_name = "anthropic/claude-3.5-sonnet"
+        mock_settings.model_name = "claude-sonnet-4-20250514"
+        mock_settings.openrouter_model = "anthropic/claude-3.5-sonnet"
         mock_settings.anthropic_api_key = None
         mock_settings.openrouter_api_key = "sk-or-test"
         mock_settings.google_credentials_path = mock_path
@@ -110,6 +111,9 @@ class TestHealthEndpoint:
         assert data["config"]["llm_provider"] == "openrouter"
         assert data["config"]["openrouter_key_present"] is True
         assert data["config"]["google_credentials_configured"] is True
+        # Verify openrouter_model is included when provider is openrouter
+        assert "openrouter_model" in data["config"]
+        assert data["config"]["openrouter_model"] == "anthropic/claude-3.5-sonnet"
 
     def test_health_check_response_structure(self, test_client):
         """Test that health check response has expected structure."""
@@ -130,3 +134,30 @@ class TestHealthEndpoint:
         assert "anthropic_key_present" in config
         assert "openrouter_key_present" in config
         assert "google_credentials_configured" in config
+    
+    @patch("sheetsmith.config.settings")
+    def test_health_check_openrouter_model_from_env(self, mock_settings, test_client):
+        """Test that health check reports openrouter_model correctly from env vars."""
+        # Create a mock path object
+        mock_path = Mock()
+        mock_path.exists = Mock(return_value=False)
+        
+        # Simulate LLM_PROVIDER=openrouter and OPENROUTER_MODEL set
+        mock_settings.llm_provider = "openrouter"
+        mock_settings.openrouter_model = "anthropic/claude-3.5-sonnet"
+        mock_settings.model_name = "claude-sonnet-4-20250514"  # Should not be used
+        mock_settings.openrouter_api_key = "sk-or-test-key"
+        mock_settings.anthropic_api_key = None
+        mock_settings.google_credentials_path = mock_path
+        
+        response = test_client.get("/api/health")
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify provider and model are correctly reported
+        assert data["config"]["llm_provider"] == "openrouter"
+        assert data["config"]["openrouter_model"] == "anthropic/claude-3.5-sonnet"
+        assert data["config"]["openrouter_key_present"] is True
+        # model_name should still be present but openrouter_model is what matters
+        assert data["config"]["model_name"] == "claude-sonnet-4-20250514"
