@@ -15,12 +15,12 @@ logger = logging.getLogger(__name__)
 class ReplacementPlan:
     """Plan for deterministic formula replacement."""
 
-    action: str  # "replace", "regex_replace"
+    action: str  # "replace" - action type for the replacement
     search_pattern: str  # What to search for
     replace_with: str  # What to replace it with
     target_sheets: Optional[list[str]] = None  # Specific sheets, or None for all
     case_sensitive: bool = False
-    is_regex: bool = False
+    is_regex: bool = False  # If True, search_pattern is treated as regex
     dry_run: bool = False
 
 
