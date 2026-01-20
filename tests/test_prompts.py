@@ -1,6 +1,5 @@
 """Tests for the agent prompts."""
 
-
 from sheetsmith.agent.prompts import SYSTEM_PROMPT, TASK_PROMPTS
 
 
