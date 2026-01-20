@@ -105,12 +105,32 @@ class SheetSmithAgent:
             changes=changes,
         )
         diff_string = patch.to_diff_string()
+
+        # Calculate stats
+        sheets = set()
+        columns = set()
+        for change in changes:
+            sheets.add(change["sheet"])
+            col = "".join(c for c in change["cell"] if c.isalpha())
+            columns.add(col)
+
         return {
             "patch_id": patch.id,
             "description": description,
             "changes_count": len(changes),
             "diff": diff_string,
-            "message": "Review the diff above. Reply 'apply' or 'approve' to apply these changes.",
+            "statistics": {
+                "total_cells": len(changes),
+                "affected_sheets": sorted(list(sheets)),
+                "affected_columns": sorted(list(columns)),
+                "sheet_count": len(sheets),
+                "column_count": len(columns),
+            },
+            "message": (
+                f"Review the diff above. This will update {len(changes)} cells "
+                f"across {len(columns)} columns in {len(sheets)} sheet(s): "
+                f"{', '.join(sorted(sheets))}. Reply 'apply' or 'approve' to apply these changes."
+            ),
         }
 
     async def _apply_patch(self, patch_id: str) -> dict:

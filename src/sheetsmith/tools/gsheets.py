@@ -152,10 +152,18 @@ class GSheetsTools:
                 )
 
             result = self.client.batch_update(batch)
+            stats = batch.get_statistics()
             return {
                 "success": result.success,
                 "updated_cells": result.updated_cells,
                 "errors": result.errors,
+                "statistics": {
+                    "total_cells": stats["total_cells"],
+                    "affected_sheets": stats["affected_sheets"],
+                    "affected_columns": stats["affected_columns"],
+                    "sheet_count": stats["sheet_count"],
+                    "column_count": stats["column_count"],
+                },
             }
 
         return Tool(

@@ -1,5 +1,6 @@
 """Google Sheets API client."""
 
+import logging
 import re
 from typing import Optional
 
@@ -18,6 +19,8 @@ from .models import (
     UpdateResult,
     CellUpdate,
 )
+
+logger = logging.getLogger(__name__)
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
@@ -215,8 +218,14 @@ class GoogleSheetsClient:
             if sheet["title"] not in sheets_to_search:
                 continue
 
+            logger.info(
+                f"Scanning sheet '{sheet['title']}' - dimensions: "
+                f"{sheet['row_count']}x{sheet['col_count']}"
+            )
+
             # Read the entire sheet
             range_notation = f"'{sheet['title']}'!A1:{index_to_col_letter(sheet['col_count'] - 1)}{sheet['row_count']}"
+            logger.debug(f"Range notation: {range_notation}")
 
             try:
                 sheet_data = self.read_range(spreadsheet_id, range_notation, include_formulas=True)
@@ -238,6 +247,9 @@ class GoogleSheetsClient:
                                 matched_text=match.group(0),
                             )
                         )
+
+            sheet_matches = [m for m in matches if m.sheet_name == sheet["title"]]
+            logger.info(f"Found {len(sheet_matches)} matching formulas in sheet '{sheet['title']}'")
 
         return matches
 
