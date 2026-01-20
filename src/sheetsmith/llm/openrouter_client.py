@@ -96,7 +96,7 @@ class OpenRouterClient(LLMClient):
                                     "type": "function",
                                     "function": {
                                         "name": item.get("name"),
-                                        "arguments": str(item.get("input", {})),
+                                        "arguments": json.dumps(item.get("input", {})),
                                     },
                                 }
                             )
@@ -120,7 +120,7 @@ class OpenRouterClient(LLMClient):
                                     "type": "function",
                                     "function": {
                                         "name": item.name,
-                                        "arguments": str(item.input),
+                                        "arguments": json.dumps(item.input),
                                     },
                                 }
                             )

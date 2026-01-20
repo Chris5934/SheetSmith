@@ -6,7 +6,6 @@ from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
 
-
 def get_agent():
     """Get the global agent instance."""
     from .app import get_agent as _get_agent
@@ -305,11 +304,11 @@ async def health_check():
         "openrouter_key_present": bool(settings.openrouter_api_key),
         "google_credentials_configured": settings.google_credentials_path.exists(),
     }
-    
+
     # Include openrouter_model when using OpenRouter provider
     if settings.llm_provider == "openrouter":
         config["openrouter_model"] = settings.openrouter_model
-    
+
     diagnostics = {
         "status": "ok",
         "service": "sheetsmith",
