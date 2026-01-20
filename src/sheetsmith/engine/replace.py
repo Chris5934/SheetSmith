@@ -3,7 +3,7 @@
 import logging
 import re
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Optional
 
 from ..sheets import GoogleSheetsClient, BatchUpdate
 from ..sheets.models import FormulaMatch
@@ -40,7 +40,7 @@ class ReplacementResult:
 class DeterministicReplacer:
     """
     Performs deterministic formula replacements without LLM involvement.
-    
+
     This class handles simple find/replace operations at scale, reserving
     LLM usage only for planning and complex edge cases.
     """
@@ -56,12 +56,12 @@ class DeterministicReplacer:
     ) -> ReplacementResult:
         """
         Execute a deterministic replacement based on a plan.
-        
+
         Args:
             spreadsheet_id: The ID of the spreadsheet
             plan: The replacement plan to execute
             description: Human-readable description of the operation
-            
+
         Returns:
             ReplacementResult with details of the operation
         """
@@ -115,7 +115,8 @@ class DeterministicReplacer:
                 cells_updated = self._apply_replacements(
                     spreadsheet_id=spreadsheet_id,
                     replacements=replacements,
-                    description=description or f"Mass replace: {plan.search_pattern} → {plan.replace_with}",
+                    description=description
+                    or f"Mass replace: {plan.search_pattern} → {plan.replace_with}",
                 )
 
             return ReplacementResult(
@@ -162,7 +163,7 @@ class DeterministicReplacer:
     ) -> list[dict]:
         """
         Generate replacement formulas based on the plan.
-        
+
         Returns list of dicts with: sheet, cell, old_formula, new_formula
         """
         replacements = []
@@ -261,12 +262,12 @@ class DeterministicReplacer:
     def can_handle_deterministically(request: str) -> bool:
         """
         Determine if a request can be handled deterministically.
-        
+
         Returns True for simple find/replace operations like:
         - "Replace VLOOKUP with XLOOKUP"
         - "Update 28.6% to 30.0%"
         - "Change 'Corruption' to 'Enhanced Corruption'"
-        
+
         Returns False for complex operations that need LLM reasoning.
         """
         request_lower = request.lower()
@@ -307,12 +308,12 @@ class DeterministicReplacer:
     def parse_simple_replacement(request: str) -> Optional[ReplacementPlan]:
         """
         Parse a simple replacement request into a ReplacementPlan.
-        
+
         Example inputs:
         - "Replace VLOOKUP with XLOOKUP in Sheet1"
         - "Update 28.6% to 30.0%"
         - "Change all references to OldSheet with NewSheet"
-        
+
         Returns None if the request cannot be parsed as a simple replacement.
         """
         # Try to extract pattern: "replace X with Y" or "change X to Y"
@@ -336,10 +337,14 @@ class DeterministicReplacer:
                 target_sheets = None
                 if target:
                     # Extract sheet names: look for word after "sheet" or quoted names
-                    sheets = re.findall(r"(?:sheet\s+)?([A-Za-z][A-Za-z0-9]*)", target, re.IGNORECASE)
+                    sheets = re.findall(
+                        r"(?:sheet\s+)?([A-Za-z][A-Za-z0-9]*)", target, re.IGNORECASE
+                    )
                     if sheets:
                         # Filter out common words like "and", "in"
-                        sheets = [s for s in sheets if s.lower() not in ('and', 'in', 'or', 'sheet')]
+                        sheets = [
+                            s for s in sheets if s.lower() not in ("and", "in", "or", "sheet")
+                        ]
                         if sheets:
                             target_sheets = sheets
 

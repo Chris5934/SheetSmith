@@ -1,12 +1,11 @@
 """Tests for deterministic formula replacement engine."""
 
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 
 from sheetsmith.engine.replace import (
     DeterministicReplacer,
     ReplacementPlan,
-    ReplacementResult,
 )
 from sheetsmith.sheets.models import FormulaMatch
 
@@ -243,7 +242,7 @@ class TestDeterministicReplacer:
         )
 
         # Execute
-        result = replacer.execute_replacement(
+        _ = replacer.execute_replacement(
             spreadsheet_id="test-123",
             plan=plan,
             description="Replace VLOOKUP in Sheet1 only",
@@ -291,12 +290,8 @@ class TestCanHandleDeterministically:
 
     def test_simple_replace_request(self):
         """Test detection of simple replace requests."""
-        assert DeterministicReplacer.can_handle_deterministically(
-            "Replace VLOOKUP with XLOOKUP"
-        )
-        assert DeterministicReplacer.can_handle_deterministically(
-            "Change 28.6% to 30.0%"
-        )
+        assert DeterministicReplacer.can_handle_deterministically("Replace VLOOKUP with XLOOKUP")
+        assert DeterministicReplacer.can_handle_deterministically("Change 28.6% to 30.0%")
         assert DeterministicReplacer.can_handle_deterministically(
             "Update Corruption to Enhanced Corruption"
         )
@@ -316,12 +311,8 @@ class TestCanHandleDeterministically:
     def test_ambiguous_requests(self):
         """Test detection of ambiguous requests."""
         # These could be deterministic but lack clear "X to Y" pattern
-        assert not DeterministicReplacer.can_handle_deterministically(
-            "Update the damage formula"
-        )
-        assert not DeterministicReplacer.can_handle_deterministically(
-            "Change the calculations"
-        )
+        assert not DeterministicReplacer.can_handle_deterministically("Update the damage formula")
+        assert not DeterministicReplacer.can_handle_deterministically("Change the calculations")
 
 
 class TestParseSimpleReplacement:
@@ -329,9 +320,7 @@ class TestParseSimpleReplacement:
 
     def test_parse_replace_with_pattern(self):
         """Test parsing 'replace X with Y' pattern."""
-        plan = DeterministicReplacer.parse_simple_replacement(
-            "Replace VLOOKUP with XLOOKUP"
-        )
+        plan = DeterministicReplacer.parse_simple_replacement("Replace VLOOKUP with XLOOKUP")
         assert plan is not None
         assert plan.search_pattern == "VLOOKUP"
         assert plan.replace_with == "XLOOKUP"
@@ -339,9 +328,7 @@ class TestParseSimpleReplacement:
 
     def test_parse_change_to_pattern(self):
         """Test parsing 'change X to Y' pattern."""
-        plan = DeterministicReplacer.parse_simple_replacement(
-            "Change 28.6% to 30.0%"
-        )
+        plan = DeterministicReplacer.parse_simple_replacement("Change 28.6% to 30.0%")
         assert plan is not None
         assert plan.search_pattern == "28.6%"
         assert plan.replace_with == "30.0%"
@@ -388,12 +375,8 @@ class TestParseSimpleReplacement:
 
     def test_unparseable_request(self):
         """Test handling of unparseable requests."""
-        plan = DeterministicReplacer.parse_simple_replacement(
-            "Do something complicated"
-        )
+        plan = DeterministicReplacer.parse_simple_replacement("Do something complicated")
         assert plan is None
 
-        plan = DeterministicReplacer.parse_simple_replacement(
-            "Fix the formulas"
-        )
+        plan = DeterministicReplacer.parse_simple_replacement("Fix the formulas")
         assert plan is None

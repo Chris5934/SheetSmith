@@ -1,6 +1,5 @@
 """Tests for sheets models."""
 
-import pytest
 
 from sheetsmith.sheets.models import BatchUpdate, CellUpdate
 

@@ -96,8 +96,10 @@ class OpenRouterClient(LLMClient):
                         elif item.get("type") == "tool_use":
                             # Convert dot names to underscore names when sending back
                             original_name = item.get("name")
-                            converted_name = self._tool_name_reverse_map.get(original_name, original_name)
-                            
+                            converted_name = self._tool_name_reverse_map.get(
+                                original_name, original_name
+                            )
+
                             tool_calls.append(
                                 {
                                     "id": item.get("id"),
@@ -124,8 +126,10 @@ class OpenRouterClient(LLMClient):
                         elif item.type == "tool_use":
                             # Convert dot names to underscore names when sending back
                             original_name = item.name
-                            converted_name = self._tool_name_reverse_map.get(original_name, original_name)
-                            
+                            converted_name = self._tool_name_reverse_map.get(
+                                original_name, original_name
+                            )
+
                             tool_calls.append(
                                 {
                                     "id": item.id,
@@ -159,16 +163,16 @@ class OpenRouterClient(LLMClient):
             original_name = tool.get("name")
             if not original_name:
                 raise ValueError("Tool must have a 'name' field")
-            
+
             converted_name = original_name.replace(".", "_")
-            
+
             # Store mapping for reverse conversion
             self._tool_name_map[converted_name] = original_name
             self._tool_name_reverse_map[original_name] = converted_name
-            
+
             # Fix input_schema to add items field for array parameters
             input_schema = self._fix_array_parameters(tool.get("input_schema", {}))
-            
+
             openrouter_tools.append(
                 {
                     "type": "function",
@@ -184,16 +188,16 @@ class OpenRouterClient(LLMClient):
 
     def _fix_array_parameters(self, schema: dict) -> dict:
         """Add 'items' field to array-type parameters in the schema.
-        
+
         OpenRouter/OpenAI requires array parameters to specify their item type.
         Defaults to string items for arrays without an items field.
         """
         if not schema or "properties" not in schema:
             return schema
-        
+
         # Create a deep copy to preserve all top-level schema fields
         fixed_schema = copy.deepcopy(schema)
-        
+
         # Fix array parameters by adding items field
         for prop_name, prop_def in fixed_schema["properties"].items():
             # Add items field for array types if not present
@@ -201,7 +205,7 @@ class OpenRouterClient(LLMClient):
                 # Default to string items - this is appropriate for most SheetSmith tools
                 # which use arrays for sheet names, tags, and similar string lists
                 prop_def["items"] = {"type": "string"}
-        
+
         return fixed_schema
 
     def _convert_response(self, data: dict) -> LLMResponse:
@@ -227,7 +231,7 @@ class OpenRouterClient(LLMClient):
                 # Convert underscore names back to dot names
                 underscore_name = tool_call["function"]["name"]
                 original_name = self._tool_name_map.get(underscore_name, underscore_name)
-                
+
                 content.append(
                     {
                         "type": "tool_use",

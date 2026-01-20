@@ -33,7 +33,7 @@ class FormulaTools:
         ) -> dict:
             """
             Perform deterministic mass replacement of formulas.
-            
+
             This tool bypasses LLM for the actual replacement operation,
             using direct string/regex replacement for efficiency.
             """

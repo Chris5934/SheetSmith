@@ -134,14 +134,14 @@ class TestHealthEndpoint:
         assert "anthropic_key_present" in config
         assert "openrouter_key_present" in config
         assert "google_credentials_configured" in config
-    
+
     @patch("sheetsmith.config.settings")
     def test_health_check_openrouter_model_from_env(self, mock_settings, test_client):
         """Test that health check reports openrouter_model correctly from env vars."""
         # Create a mock path object
         mock_path = Mock()
         mock_path.exists = Mock(return_value=False)
-        
+
         # Simulate LLM_PROVIDER=openrouter and OPENROUTER_MODEL set
         mock_settings.llm_provider = "openrouter"
         mock_settings.openrouter_model = "anthropic/claude-3.5-sonnet"
@@ -149,12 +149,12 @@ class TestHealthEndpoint:
         mock_settings.openrouter_api_key = "sk-or-test-key"
         mock_settings.anthropic_api_key = None
         mock_settings.google_credentials_path = mock_path
-        
+
         response = test_client.get("/api/health")
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         # Verify provider and model are correctly reported
         assert data["config"]["llm_provider"] == "openrouter"
         assert data["config"]["openrouter_model"] == "anthropic/claude-3.5-sonnet"
