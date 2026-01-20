@@ -298,16 +298,22 @@ async def health_check():
     from ..config import settings
 
     # Gather non-secret diagnostics
+    config = {
+        "llm_provider": settings.llm_provider,
+        "model_name": settings.model_name,
+        "anthropic_key_present": bool(settings.anthropic_api_key),
+        "openrouter_key_present": bool(settings.openrouter_api_key),
+        "google_credentials_configured": settings.google_credentials_path.exists(),
+    }
+    
+    # Include openrouter_model when using OpenRouter provider
+    if settings.llm_provider == "openrouter":
+        config["openrouter_model"] = settings.openrouter_model
+    
     diagnostics = {
         "status": "ok",
         "service": "sheetsmith",
-        "config": {
-            "llm_provider": settings.llm_provider,
-            "model_name": settings.model_name,
-            "anthropic_key_present": bool(settings.anthropic_api_key),
-            "openrouter_key_present": bool(settings.openrouter_api_key),
-            "google_credentials_configured": settings.google_credentials_path.exists(),
-        },
+        "config": config,
     }
 
     return diagnostics

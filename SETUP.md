@@ -6,7 +6,7 @@ This guide walks you through setting up SheetSmith from scratch.
 
 - Python 3.10 or higher
 - A Google Cloud Platform account
-- An Anthropic API key
+- An Anthropic API key OR an OpenRouter API key (OpenRouter supports multiple LLM providers)
 
 ## Step 1: Google Cloud Setup
 
@@ -37,13 +37,26 @@ This guide walks you through setting up SheetSmith from scratch.
 5. Download the JSON file
 6. Rename it to `credentials.json` and place it in the SheetSmith directory
 
-## Step 2: Anthropic API Setup
+## Step 2: LLM Provider Setup
+
+Choose either Anthropic (direct) or OpenRouter (supports multiple LLM providers).
+
+### Option A: Anthropic API Setup (Direct)
 
 1. Go to [Anthropic Console](https://console.anthropic.com/)
 2. Create an account or sign in
 3. Go to **API Keys**
 4. Create a new API key
 5. Copy the key (you'll need it for the `.env` file)
+
+### Option B: OpenRouter API Setup (Recommended for flexibility)
+
+1. Go to [OpenRouter](https://openrouter.ai/)
+2. Create an account or sign in
+3. Go to **Keys** in your account settings
+4. Create a new API key
+5. Copy the key (you'll need it for the `.env` file)
+6. Note: OpenRouter supports multiple models including Claude, GPT-4, and others
 
 ## Step 3: Install SheetSmith
 
@@ -70,11 +83,30 @@ cp .env.example .env
 nano .env  # or use your preferred editor
 ```
 
-Required settings:
+### For Anthropic (Direct):
 ```
+LLM_PROVIDER=anthropic
 ANTHROPIC_API_KEY=your-api-key-here
+MODEL_NAME=claude-sonnet-4-20250514
 GOOGLE_CREDENTIALS_PATH=credentials.json
 ```
+
+### For OpenRouter:
+```
+LLM_PROVIDER=openrouter
+OPENROUTER_API_KEY=your-openrouter-key-here
+OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
+GOOGLE_CREDENTIALS_PATH=credentials.json
+```
+
+**Note**: When using OpenRouter, you only need to set `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`. You do NOT need to set `ANTHROPIC_API_KEY` or `MODEL_NAME`.
+
+Available OpenRouter models include:
+- `anthropic/claude-3.5-sonnet` (recommended)
+- `anthropic/claude-3-opus`
+- `openai/gpt-4`
+- `openai/gpt-4-turbo`
+- Many others - see [OpenRouter Models](https://openrouter.ai/models)
 
 ## Step 5: Authenticate with Google
 
