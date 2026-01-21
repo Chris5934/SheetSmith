@@ -294,11 +294,15 @@ class LLMDiagnostics:
             )
         
         # Compare estimated vs actual cost if available
-        if actual_cost is not None and abs(actual_cost - estimated_cost) / max(actual_cost, 0.0001) > 0.5:
-            pre_report.warnings.append(
-                f"Cost estimate mismatch: estimated {estimated_cost:.4f} cents, "
-                f"actual {actual_cost:.4f} cents"
-            )
+        if actual_cost is not None:
+            # Avoid division by zero, use the larger of the two costs
+            denominator = max(actual_cost, estimated_cost, 0.0001)
+            cost_difference_ratio = abs(actual_cost - estimated_cost) / denominator
+            if cost_difference_ratio > 0.5:
+                pre_report.warnings.append(
+                    f"Cost estimate mismatch: estimated {estimated_cost:.4f} cents, "
+                    f"actual {actual_cost:.4f} cents"
+                )
         
         return pre_report
     
@@ -350,21 +354,44 @@ class LLMDiagnostics:
     def _detect_sheet_content(self, messages: list) -> int:
         """Detect and measure sheet content in messages.
         
+        This is a heuristic to detect if structured spreadsheet data
+        is being sent in messages. It looks for patterns that suggest
+        spreadsheet-specific content rather than just words like "sheet".
+        
         Args:
             messages: List of messages
             
         Returns:
             Estimated size of sheet content in characters
         """
-        # Simple heuristic: look for structured data patterns
-        # This is a rough estimate
+        # More sophisticated heuristic: look for structured data patterns
+        # and cell reference patterns, not just words
         sheet_content = 0
         
         for msg in messages:
             content = msg.get("content", "")
             if isinstance(content, str):
-                # Look for patterns like cell references, formulas, etc.
-                if any(pattern in content.lower() for pattern in ["sheet", "cell", "formula", "range"]):
+                # Count content if it has multiple indicators of spreadsheet data:
+                # - Cell references like A1, B2, etc.
+                # - Multiple instances of "formula", "range", etc. in context
+                # - Structured data patterns (multiple | or tab characters)
+                indicators = 0
+                
+                # Check for cell references (e.g., A1, B2, C10)
+                import re
+                if re.search(r'\b[A-Z]+\d+\b', content):
+                    indicators += 1
+                
+                # Check for formula syntax
+                if '=' in content and any(func in content for func in ['SUM', 'AVERAGE', 'IF', 'VLOOKUP']):
+                    indicators += 1
+                
+                # Check for structured data (tables with | or tabs)
+                if content.count('|') > 5 or content.count('\t') > 5:
+                    indicators += 1
+                
+                # Only count if we have multiple indicators
+                if indicators >= 2:
                     sheet_content += len(content)
         
         return sheet_content

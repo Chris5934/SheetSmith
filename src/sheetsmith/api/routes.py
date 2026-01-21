@@ -1236,17 +1236,15 @@ async def get_cost_summary(
         # Get budget status
         budget_status = agent.budget_guard.get_budget_status()
         
+        # Import expected costs from CostSpikeDetector to avoid duplication
+        from ..llm.diagnostics import CostSpikeDetector
+        expected_costs = CostSpikeDetector.EXPECTED_COSTS
+        
         # Combine into comprehensive summary
         return {
             "session_summary": summary,
             "budget_status": budget_status,
-            "cost_per_operation": {
-                "parser": 0.1,
-                "helper": 0.3,
-                "ai_assist": 1.0,
-                "planning": 5.0,
-                "full_agent": 5.0,
-            },
+            "cost_per_operation": expected_costs,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
