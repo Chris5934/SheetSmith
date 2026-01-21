@@ -58,6 +58,22 @@ class Settings(BaseModel):
 
     # Model selection for different operations
     planning_model: str = os.getenv("PLANNING_MODEL", "")  # Empty means use main model
+    parser_model: str = os.getenv("PARSER_MODEL", "anthropic/claude-3-haiku")
+    ai_assist_model: str = os.getenv("AI_ASSIST_MODEL", "anthropic/claude-3-haiku")
+    
+    # Token limits by operation type
+    parser_max_tokens: int = int(os.getenv("PARSER_MAX_TOKENS", "300"))
+    ai_assist_max_tokens: int = int(os.getenv("AI_ASSIST_MAX_TOKENS", "400"))
+    planning_max_tokens: int = int(os.getenv("PLANNING_MAX_TOKENS", "800"))
+    
+    # Hard caps for payload size
+    prompt_max_chars: int = int(os.getenv("PROMPT_MAX_CHARS", "10000"))
+    spreadsheet_content_max_chars: int = int(os.getenv("SPREADSHEET_CONTENT_MAX_CHARS", "5000"))
+    formula_sample_limit: int = int(os.getenv("FORMULA_SAMPLE_LIMIT", "5"))
+    
+    # Operation mode settings
+    use_json_mode: bool = os.getenv("USE_JSON_MODE", "true").lower() == "true"  # Use JSON-only instead of tools
+    use_free_models: bool = os.getenv("USE_FREE_MODELS", "false").lower() == "true"  # Use :free suffix
 
     # Cost tracking and limits
     enable_cost_logging: bool = os.getenv("ENABLE_COST_LOGGING", "true").lower() == "true"
