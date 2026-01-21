@@ -1,7 +1,7 @@
 """Google Sheets API integration."""
 
 from .client import GoogleSheetsClient
-from .models import CellData, SheetRange, FormulaMatch, BatchUpdate, UpdateResult
+from .models import CellData, SheetRange, FormulaMatch, BatchUpdate, UpdateResult, CellUpdate
 
 __all__ = [
     "GoogleSheetsClient",
@@ -10,4 +10,5 @@ __all__ = [
     "FormulaMatch",
     "BatchUpdate",
     "UpdateResult",
+    "CellUpdate",
 ]
