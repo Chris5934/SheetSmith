@@ -334,7 +334,7 @@ body {
 
 /* Mode Panels */
 .mode-panel {
-    display: none;
+    display: none !important;
     flex-direction: column;
     height: 100%;
     overflow-y: auto;
@@ -342,7 +342,7 @@ body {
 }
 
 .mode-panel.active {
-    display: flex;
+    display: flex !important;
 }
 
 .panel-header {
@@ -381,7 +381,7 @@ body {
 }
 
 .operation-form {
-    display: none;
+    display: none !important;
     margin-top: 24px;
     padding: 20px;
     background-color: var(--bg-secondary);
@@ -390,7 +390,7 @@ body {
 }
 
 .operation-form.active {
-    display: block;
+    display: block !important;
 }
 
 .input-with-button {
