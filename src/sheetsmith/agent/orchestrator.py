@@ -14,6 +14,11 @@ from ..llm import (
     LLMClient,
     LLMCallLogger,
     BudgetGuard,
+    OperationBudgetGuard,
+    OperationType,
+    PARSER_SYSTEM_PROMPT,
+    AI_ASSIST_SYSTEM_PROMPT,
+    PLANNING_SYSTEM_PROMPT,
     calculate_message_chars,
     calculate_tools_size,
     estimate_tokens_from_chars,
@@ -58,6 +63,7 @@ class SheetSmithAgent:
             session_budget_cents=settings.session_budget_cents,
             alert_threshold_cents=settings.high_cost_threshold_cents,
         )
+        self.operation_budget_guard = OperationBudgetGuard()
 
         # Conversation history
         self.messages: list[dict] = []
@@ -168,36 +174,155 @@ class SheetSmithAgent:
         """Shutdown the agent."""
         await self.memory_store.close()
 
+    def _detect_operation_type(self, user_message: str) -> OperationType:
+        """Detect the operation type from user message.
+        
+        Args:
+            user_message: The user's message
+            
+        Returns:
+            The detected operation type
+        """
+        # Simple heuristics for operation detection
+        msg_lower = user_message.lower()
+        
+        # Keywords indicating planning/complex operations
+        planning_keywords = ["search", "find", "show me", "what", "which", "where", "audit", "list"]
+        if any(keyword in msg_lower for keyword in planning_keywords):
+            return "planning"
+        
+        # Keywords indicating simple operations
+        parser_keywords = ["replace", "change", "update", "fix", "set"]
+        if any(keyword in msg_lower for keyword in parser_keywords):
+            return "parser"
+        
+        # Default to ai_assist for ambiguous requests
+        return "ai_assist"
+    
+    def _get_context_for_llm(self, operation: OperationType) -> list[dict]:
+        """Get minimal context based on operation type.
+        
+        Args:
+            operation: The operation type
+            
+        Returns:
+            List of messages to send to LLM
+        """
+        if operation == "parser":
+            # Parser is stateless - only send current message
+            return self.messages[-1:] if self.messages else []
+        elif operation == "ai_assist":
+            # AI assist keeps last 2-3 exchanges (4-6 messages)
+            return self.messages[-6:]
+        else:
+            # Planning mode keeps more context but still limited
+            return self.messages[-10:]
+    
+    def _get_system_prompt(self, operation: OperationType) -> str:
+        """Get system prompt based on operation type.
+        
+        Args:
+            operation: The operation type
+            
+        Returns:
+            System prompt string
+        """
+        if operation == "parser":
+            return PARSER_SYSTEM_PROMPT
+        elif operation == "ai_assist":
+            return AI_ASSIST_SYSTEM_PROMPT
+        elif operation == "planning":
+            return PLANNING_SYSTEM_PROMPT
+        else:
+            # Fallback to full prompt for complex operations
+            return SYSTEM_PROMPT
+    
+    def _get_model_for_operation(self, operation: OperationType) -> str:
+        """Get the appropriate model for an operation type.
+        
+        Args:
+            operation: The operation type
+            
+        Returns:
+            Model name to use
+        """
+        if settings.llm_provider == "openrouter":
+            # Use operation-specific models for OpenRouter
+            base_model = settings.openrouter_model
+            if operation == "parser" and settings.parser_model:
+                base_model = settings.parser_model
+            elif operation == "ai_assist" and settings.ai_assist_model:
+                base_model = settings.ai_assist_model
+            
+            # Add :free suffix if enabled
+            if settings.use_free_models and ":free" not in base_model:
+                base_model = f"{base_model}:free"
+            
+            return base_model
+        else:
+            # Anthropic doesn't have free models, use Haiku for parser/assist
+            if operation == "parser" or operation == "ai_assist":
+                return "claude-3-haiku-20240307"
+            return settings.model_name
+    
+    def _get_max_tokens_for_operation(self, operation: OperationType) -> int:
+        """Get max_tokens setting for an operation type.
+        
+        Args:
+            operation: The operation type
+            
+        Returns:
+            Maximum tokens to generate
+        """
+        if operation == "parser":
+            return settings.parser_max_tokens
+        elif operation == "ai_assist":
+            return settings.ai_assist_max_tokens
+        elif operation == "planning":
+            return settings.planning_max_tokens
+        else:
+            return settings.max_tokens
+
     async def process_message(self, user_message: str) -> str:
         """Process a user message and return the agent's response."""
         self.messages.append({"role": "user", "content": user_message})
 
-        # Determine the model to use
-        model = (
-            settings.openrouter_model
-            if settings.llm_provider == "openrouter"
-            else settings.model_name
-        )
-
-        # Prepare LLM call parameters
-        tools = self.registry.to_anthropic_tools()
+        # Detect operation type based on message content
+        operation: OperationType = self._detect_operation_type(user_message)
+        
+        # Get operation-specific settings
+        model = self._get_model_for_operation(operation)
+        max_tokens = self._get_max_tokens_for_operation(operation)
+        system_prompt = self._get_system_prompt(operation)
+        context_messages = self._get_context_for_llm(operation)
+        
+        # Prepare tools - only use them if NOT in JSON mode or if operation requires it
+        tools = []
+        if not settings.use_json_mode or operation in ["planning", "tool_continuation"]:
+            tools = self.registry.to_anthropic_tools()
         
         # Pre-call cost checks
-        message_chars = calculate_message_chars(self.messages)
+        message_chars = calculate_message_chars(context_messages)
         tools_size = calculate_tools_size(tools)
-        system_chars = len(SYSTEM_PROMPT)
+        system_chars = len(system_prompt)
         total_chars = message_chars + system_chars
+        
+        # Validate prompt size against hard cap
+        if total_chars > settings.prompt_max_chars:
+            return (
+                f"❌ Request too large: {total_chars} chars exceeds limit of "
+                f"{settings.prompt_max_chars} chars. Please shorten your request."
+            )
         
         # Check payload size
         try:
             self.budget_guard.check_payload_size(total_chars)
         except ValueError as e:
-            # Return error to user instead of crashing
             return f"❌ Request rejected: {str(e)}"
         
         # Estimate tokens
         estimated_input_tokens = estimate_tokens_from_chars(total_chars + tools_size)
-        estimated_output_tokens = settings.max_tokens
+        estimated_output_tokens = max_tokens
         
         # Check token limits
         try:
@@ -205,7 +330,19 @@ class SheetSmithAgent:
         except ValueError as e:
             return f"❌ Request rejected: {str(e)}"
         
-        # Check budget
+        # Estimate cost
+        estimated_cost = self.budget_guard.estimate_cost(
+            model, estimated_input_tokens, estimated_output_tokens
+        )
+        
+        # Check operation-specific budget
+        allowed, error_msg = self.operation_budget_guard.check_operation_budget(
+            operation, estimated_cost, estimated_input_tokens
+        )
+        if not allowed:
+            return f"❌ {error_msg}"
+        
+        # Check overall budget
         allowed, message = self.budget_guard.check_budget(
             model, estimated_input_tokens, estimated_output_tokens
         )
@@ -216,13 +353,13 @@ class SheetSmithAgent:
         if message and settings.alert_on_high_cost:
             print(f"\n{message}\n")
         
-        # Call LLM with tools
+        # Call LLM with or without tools
         response = self.client.create_message(
             model=model,
-            max_tokens=settings.max_tokens,
-            system=SYSTEM_PROMPT,
+            max_tokens=max_tokens,
+            system=system_prompt,
             tools=tools,
-            messages=self.messages,
+            messages=context_messages,
         )
         
         # Post-call logging
@@ -233,7 +370,7 @@ class SheetSmithAgent:
         
         # Log the call
         self.call_logger.log_call(
-            operation="process_message",
+            operation=operation,
             model=model,
             provider=settings.llm_provider,
             input_tokens=input_tokens,
@@ -241,7 +378,7 @@ class SheetSmithAgent:
             message_chars=message_chars,
             tools_included=len(tools) > 0,
             tools_size_bytes=tools_size,
-            max_tokens=settings.max_tokens,
+            max_tokens=max_tokens,
             cost_cents=actual_cost,
             usage_data=usage,
         )
@@ -250,10 +387,19 @@ class SheetSmithAgent:
         self.budget_guard.update_session_cost(actual_cost)
 
         # Process response, handling tool calls
-        return await self._process_response(response)
+        return await self._process_response(response, operation, context_messages)
 
-    async def _process_response(self, response) -> str:
-        """Process LLM response, handling any tool calls."""
+    async def _process_response(self, response, operation: OperationType = "tool_continuation", context_messages: list[dict] = None) -> str:
+        """Process LLM response, handling any tool calls.
+        
+        Args:
+            response: The LLM response
+            operation: The operation type (defaults to tool_continuation for recursive calls)
+            context_messages: The messages that were sent (for continuation calls)
+        """
+        if context_messages is None:
+            context_messages = self.messages
+            
         assistant_content = []
         final_text = ""
 
@@ -304,25 +450,37 @@ class SheetSmithAgent:
             # Add tool results to messages
             self.messages.append({"role": "user", "content": tool_results})
 
-            # Determine the model to use
-            model = (
-                settings.openrouter_model
-                if settings.llm_provider == "openrouter"
-                else settings.model_name
-            )
+            # Use continuation operation type
+            continuation_operation: OperationType = "tool_continuation"
+            model = self._get_model_for_operation(continuation_operation)
+            max_tokens = self._get_max_tokens_for_operation(continuation_operation)
+            system_prompt = self._get_system_prompt(continuation_operation)
+            continuation_context = self._get_context_for_llm(continuation_operation)
 
             # Prepare for continuation call
             tools = self.registry.to_anthropic_tools()
             
             # Pre-call cost checks for continuation
-            message_chars = calculate_message_chars(self.messages)
+            message_chars = calculate_message_chars(continuation_context)
             tools_size = calculate_tools_size(tools)
-            system_chars = len(SYSTEM_PROMPT)
+            system_chars = len(system_prompt)
             total_chars = message_chars + system_chars
             
             # Estimate tokens for continuation
             estimated_input_tokens = estimate_tokens_from_chars(total_chars + tools_size)
-            estimated_output_tokens = settings.max_tokens
+            estimated_output_tokens = max_tokens
+            
+            # Estimate cost
+            estimated_cost = self.budget_guard.estimate_cost(
+                model, estimated_input_tokens, estimated_output_tokens
+            )
+            
+            # Check operation-specific budget for continuation
+            allowed, error_msg = self.operation_budget_guard.check_operation_budget(
+                continuation_operation, estimated_cost, estimated_input_tokens
+            )
+            if not allowed:
+                return final_text + f"\n\n⚠️ Unable to continue: {error_msg}"
             
             # Check budget for continuation
             allowed, message = self.budget_guard.check_budget(
@@ -335,10 +493,10 @@ class SheetSmithAgent:
             # Continue conversation
             continuation = self.client.create_message(
                 model=model,
-                max_tokens=settings.max_tokens,
-                system=SYSTEM_PROMPT,
+                max_tokens=max_tokens,
+                system=system_prompt,
                 tools=tools,
-                messages=self.messages,
+                messages=continuation_context,
             )
             
             # Post-call logging for continuation
@@ -349,7 +507,7 @@ class SheetSmithAgent:
             
             # Log the continuation call
             self.call_logger.log_call(
-                operation="tool_continuation",
+                operation=continuation_operation,
                 model=model,
                 provider=settings.llm_provider,
                 input_tokens=input_tokens,
@@ -357,7 +515,7 @@ class SheetSmithAgent:
                 message_chars=message_chars,
                 tools_included=len(tools) > 0,
                 tools_size_bytes=tools_size,
-                max_tokens=settings.max_tokens,
+                max_tokens=max_tokens,
                 cost_cents=actual_cost,
                 usage_data=usage,
             )
@@ -365,7 +523,7 @@ class SheetSmithAgent:
             # Update session cost
             self.budget_guard.update_session_cost(actual_cost)
 
-            return await self._process_response(continuation)
+            return await self._process_response(continuation, continuation_operation, continuation_context)
 
         return final_text
 
