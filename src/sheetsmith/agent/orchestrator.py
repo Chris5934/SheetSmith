@@ -389,7 +389,12 @@ class SheetSmithAgent:
         # Process response, handling tool calls
         return await self._process_response(response, operation, context_messages)
 
-    async def _process_response(self, response, operation: OperationType = "tool_continuation", context_messages: list[dict] = None) -> str:
+    async def _process_response(
+        self,
+        response,
+        operation: Optional[OperationType] = None,
+        context_messages: Optional[list[dict]] = None
+    ) -> str:
         """Process LLM response, handling any tool calls.
         
         Args:
@@ -397,8 +402,13 @@ class SheetSmithAgent:
             operation: The operation type (defaults to tool_continuation for recursive calls)
             context_messages: The messages that were sent (for continuation calls)
         """
+        # Default to tool_continuation for recursive calls
+        if operation is None:
+            operation = "tool_continuation"
+            
+        # Default to full message history if not provided
         if context_messages is None:
-            context_messages = self.messages
+            context_messages = self.messages.copy()
             
         assistant_content = []
         final_text = ""

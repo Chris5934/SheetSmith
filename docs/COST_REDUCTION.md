@@ -228,10 +228,10 @@ Hard-coded limits prevent expensive operations:
 
 ```python
 OPERATION_BUDGETS = {
-    "parser": 0.001 cents,           # $0.00001
-    "ai_assist": 0.01 cents,         # $0.0001
-    "planning": 0.05 cents,          # $0.0005
-    "tool_continuation": 0.02 cents, # $0.0002
+    "parser": 0.001,           # $0.001 (0.1 cents)
+    "ai_assist": 0.01,         # $0.01 (1 cent)
+    "planning": 0.05,          # $0.05 (5 cents)
+    "tool_continuation": 0.02, # $0.02 (2 cents)
 }
 ```
 

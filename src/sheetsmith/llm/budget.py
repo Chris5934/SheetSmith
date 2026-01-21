@@ -1,12 +1,10 @@
 """Per-operation budget management for LLM calls."""
 
 from typing import Literal, Optional
-from dataclasses import dataclass
 
 OperationType = Literal["parser", "ai_assist", "planning", "tool_continuation"]
 
 
-@dataclass
 class OperationBudgetLimits:
     """Budget limits for different operation types."""
     
