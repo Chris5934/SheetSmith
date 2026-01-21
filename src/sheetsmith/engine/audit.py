@@ -81,7 +81,7 @@ class AuditLogger:
             changes_applied=entry.changes_applied,
         )
         
-        await self.memory_store.log_audit(audit_log)
+        await self.memory_store.log_action(audit_log)
         logger.info(
             f"Logged audit entry: {entry.id} - {entry.operation_type} - "
             f"{entry.status} - {entry.changes_applied} changes"
