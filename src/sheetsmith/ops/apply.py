@@ -73,8 +73,24 @@ class ApplyEngine:
         
         # Re-run safety checks before apply (double-check)
         scope_summary = self._preview_to_scope_summary(preview)
+        safety_check = self.safety_checker.check_operation_safety(
+            Operation(
+                operation_type=preview.operation_type,
+                description=preview.description,
+            ),
+            scope_summary
+        )
         
-        # Validate safety constraints (legacy validator)
+        if not safety_check.passed:
+            return ApplyResponse(
+                success=False,
+                preview_id=preview.preview_id,
+                spreadsheet_id=preview.spreadsheet_id,
+                cells_updated=0,
+                errors=safety_check.errors,
+            )
+        
+        # Also validate with legacy safety constraints for backwards compatibility
         is_safe, violations = self.safety_validator.validate_operation(
             cells_affected=preview.scope.total_cells,
             sheets_affected=preview.scope.sheet_count,

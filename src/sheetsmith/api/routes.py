@@ -9,7 +9,10 @@ from ..ops import (
     SearchRequest,
     PreviewRequest,
     ApplyRequest,
+    SafetyChecker,
 )
+from ..ops.safety_models import ScopeSummary
+from ..ops.models import Operation, OperationType
 
 router = APIRouter()
 
@@ -586,10 +589,6 @@ async def ops_preflight(request: PreflightRequest):
     
     Returns safety check results without creating a preview.
     """
-    from ..ops import SafetyChecker
-    from ..ops.safety_models import ScopeSummary
-    from ..ops.models import Operation, OperationType
-    
     ops_engine = get_ops_engine()
     safety_checker = SafetyChecker(ops_engine.sheets_client)
     
@@ -597,13 +596,23 @@ async def ops_preflight(request: PreflightRequest):
         # Parse operation from dict
         operation = Operation(**request.operation)
         
+        # Extract sheet names if available
+        sheet_names = []
+        if operation.search_criteria and operation.search_criteria.sheet_names:
+            sheet_names = operation.search_criteria.sheet_names
+        
+        # Extract header name if available
+        headers_affected = []
+        if operation.header_name:
+            headers_affected.append(operation.header_name)
+        
         # Create minimal scope summary for preflight
         # In a real implementation, would do a quick search to estimate scope
         scope = ScopeSummary(
             total_cells=0,  # Estimated, would need actual search
-            total_sheets=len(operation.search_criteria.sheet_names) if operation.search_criteria and operation.search_criteria.sheet_names else 1,
-            sheet_names=operation.search_criteria.sheet_names if operation.search_criteria and operation.search_criteria.sheet_names else [],
-            headers_affected=[operation.header_name] if operation.header_name else [],
+            total_sheets=len(sheet_names) if sheet_names else 1,
+            sheet_names=sheet_names,
+            headers_affected=headers_affected,
             formula_patterns_matched=[operation.find_pattern] if operation.find_pattern else [],
         )
         
@@ -639,8 +648,6 @@ async def audit_ops_mappings(spreadsheet_id: str):
     
     Returns detailed audit report with recommendations.
     """
-    from ..ops import SafetyChecker
-    
     ops_engine = get_ops_engine()
     safety_checker = SafetyChecker(ops_engine.sheets_client)
     
