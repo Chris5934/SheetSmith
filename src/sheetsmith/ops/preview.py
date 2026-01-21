@@ -372,9 +372,16 @@ class PreviewGenerator:
                 lines.append(f"+  FORMULA: {change.new_formula}")
                 # Use differ to highlight changes if both formulas exist
                 if change.old_formula:
-                    diff = self.differ.generate_diff(change.old_formula, change.new_formula)
-                    if diff.has_changes:
-                        lines.append(f"   DIFF:    {diff.text_diff}")
+                    diff = self.differ.diff_formula(
+                        change.old_formula, change.new_formula, change.cell, change.sheet_name
+                    )
+                    if diff.changes:
+                        # Show changes summary
+                        changes_text = ", ".join([
+                            f"{c['type']}: '{c['old']}' -> '{c['new']}'" 
+                            for c in diff.changes[:3]  # Show first 3 changes
+                        ])
+                        lines.append(f"   CHANGES: {changes_text}")
             elif change.new_value is not None:
                 lines.append(f"+  {change.new_value}")
             
