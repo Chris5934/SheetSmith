@@ -421,3 +421,66 @@ class PreviewGenerator:
             diffs.append(diff)
         
         return diffs
+    
+    def format_preview_for_display(
+        self,
+        preview,
+        max_changes: int = 20
+    ) -> str:
+        """
+        Format preview as human-readable diff (spec-compliant formatting).
+        
+        Args:
+            preview: PreviewResponse object to format
+            max_changes: Maximum number of changes to display
+            
+        Returns:
+            Formatted preview text with scope, warnings, and changes
+        """
+        from ..engine.safety import OperationScope, SafetyCheck
+        
+        lines = [
+            f"# Preview: {preview.operation_type.value}",
+            f"# Preview ID: {preview.preview_id}",
+            "",
+            "## Scope Analysis",
+            f"- Total cells: {preview.scope.total_cells}",
+            f"- Affected sheets: {', '.join(preview.scope.affected_sheets)}",
+            f"- Affected headers: {', '.join(preview.scope.affected_headers)}",
+            f"- Sheet count: {preview.scope.sheet_count}",
+            "",
+        ]
+        
+        # Add approval requirement if needed
+        if preview.scope.requires_approval:
+            lines.append("⚠️  **This operation requires explicit approval**")
+            lines.append("")
+        
+        # Add changes preview
+        lines.append("## Changes")
+        display_count = min(len(preview.changes), max_changes)
+        
+        for change in preview.changes[:display_count]:
+            lines.append(f"\n### {change.sheet_name}!{change.cell}")
+            if change.header:
+                lines.append(f"Header: {change.header}")
+            if change.row_label:
+                lines.append(f"Row: {change.row_label}")
+            
+            lines.append("```diff")
+            if change.old_formula:
+                lines.append(f"- FORMULA: {change.old_formula}")
+            elif change.old_value is not None:
+                lines.append(f"- VALUE: {change.old_value}")
+            
+            if change.new_formula:
+                lines.append(f"+ FORMULA: {change.new_formula}")
+            elif change.new_value is not None:
+                lines.append(f"+ VALUE: {change.new_value}")
+            lines.append("```")
+        
+        if len(preview.changes) > max_changes:
+            remaining = len(preview.changes) - max_changes
+            lines.append(f"\n... and {remaining} more changes (showing first {max_changes})")
+        
+        return "\n".join(lines)

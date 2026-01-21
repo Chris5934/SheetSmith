@@ -1,10 +1,16 @@
 """Main deterministic operations engine."""
 
 import logging
+import time
+import uuid
+from datetime import datetime
 from typing import Optional
 
 from ..sheets import GoogleSheetsClient
 from ..memory import MemoryStore
+from ..engine.safety import SafetyValidator, OperationScope
+from ..engine.scope import ScopeAnalyzer
+from ..engine.audit import AuditLogger
 from .models import (
     SearchCriteria,
     SearchResult,
@@ -18,6 +24,11 @@ from .apply import ApplyEngine
 from .cache import PreviewCache
 
 logger = logging.getLogger(__name__)
+
+
+class SafetyCheckFailedError(Exception):
+    """Raised when safety checks fail for an operation."""
+    pass
 
 
 class DeterministicOpsEngine:
@@ -50,10 +61,15 @@ class DeterministicOpsEngine:
         )
         self.apply_engine = ApplyEngine(self.sheets_client, self.memory_store)
         
+        # Safety components
+        self.safety_validator = SafetyValidator()
+        self.scope_analyzer = ScopeAnalyzer(self.sheets_client)
+        self.audit_logger = AuditLogger(self.memory_store)
+        
         # Preview cache
         self.preview_cache = PreviewCache(default_ttl_minutes=30)
         
-        logger.info("DeterministicOpsEngine initialized")
+        logger.info("DeterministicOpsEngine initialized with safety features")
 
     def search(
         self, spreadsheet_id: str, criteria: SearchCriteria, limit: int = 1000
@@ -191,3 +207,122 @@ class DeterministicOpsEngine:
         if count > 0:
             logger.info(f"Cleaned up {count} expired previews")
         return count
+    
+    async def execute_with_safety(
+        self,
+        spreadsheet_id: str,
+        operation: Operation,
+        require_preview: bool = True
+    ) -> PreviewResponse:
+        """
+        Execute operation with full safety checks (spec-compliant method).
+        
+        This method implements the complete safety workflow:
+        1. Analyze scope of operation
+        2. Run safety validation
+        3. Block if not allowed
+        4. Generate preview if required
+        5. Log to audit trail
+        
+        Args:
+            spreadsheet_id: The spreadsheet to operate on
+            operation: The operation to execute
+            require_preview: If True, always generate preview (default)
+            
+        Returns:
+            PreviewResponse for user approval
+            
+        Raises:
+            SafetyCheckFailedError: If operation violates safety constraints
+        """
+        start_time = time.time()
+        
+        logger.info(
+            f"Executing operation with safety: {operation.operation_type} "
+            f"on {spreadsheet_id}"
+        )
+        
+        # 1. Generate preview to analyze scope
+        preview = self.generate_preview(
+            spreadsheet_id, operation, dry_run=True
+        )
+        
+        # 2. Analyze scope from preview changes
+        scope = self.scope_analyzer.analyze_from_changes(
+            preview.changes, operation.operation_type.value
+        )
+        
+        # 3. Run safety validation
+        safety_check = self.safety_validator.validate_operation_with_scope(
+            operation.operation_type.value,
+            scope,
+            dry_run=False
+        )
+        
+        # 4. Block if not allowed
+        if not safety_check.allowed:
+            error_msg = "\n".join(safety_check.errors)
+            logger.error(f"Safety check failed: {error_msg}")
+            
+            # Log failed attempt to audit trail
+            await self._log_safety_failure(
+                spreadsheet_id, operation, scope, safety_check.errors, time.time() - start_time
+            )
+            
+            raise SafetyCheckFailedError(
+                f"Operation blocked by safety checks:\n{error_msg}"
+            )
+        
+        # 5. Generate full preview if required or requested
+        if require_preview or safety_check.requires_preview:
+            logger.info("Generating preview for user approval")
+            preview = self.generate_preview(
+                spreadsheet_id, operation, dry_run=False
+            )
+            
+            # Log preview generation
+            duration_ms = (time.time() - start_time) * 1000
+            logger.info(
+                f"Preview generated successfully: {preview.preview_id} "
+                f"({duration_ms:.2f}ms)"
+            )
+            
+            return preview
+        
+        # If no preview required (should rarely happen), execute immediately
+        logger.warning(
+            "Executing operation without preview - this should be rare"
+        )
+        preview = self.generate_preview(
+            spreadsheet_id, operation, dry_run=False
+        )
+        
+        return preview
+    
+    async def _log_safety_failure(
+        self,
+        spreadsheet_id: str,
+        operation: Operation,
+        scope: OperationScope,
+        errors: list[str],
+        duration_seconds: float
+    ):
+        """Log a safety check failure to audit trail."""
+        from ..engine.audit import AuditEntry
+        from dataclasses import asdict
+        
+        entry = AuditEntry(
+            id=str(uuid.uuid4()),
+            timestamp=datetime.utcnow().isoformat(),
+            operation_type=operation.operation_type.value,
+            spreadsheet_id=spreadsheet_id,
+            user="system",
+            preview_id=None,
+            scope=asdict(scope),
+            status="failed",
+            changes_applied=0,
+            errors=errors,
+            duration_ms=duration_seconds * 1000
+        )
+        
+        await self.audit_logger.log_operation(entry)

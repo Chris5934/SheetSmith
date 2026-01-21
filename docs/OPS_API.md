@@ -102,10 +102,30 @@ Generate a preview of proposed changes.
     "sheet_count": 1,
     "requires_approval": false
   },
-  "diff_text": "...",
+  "diff_text": "--- Sheet1!B2\n-  =SUM(C2:D2)\n+  =SUMIF(C2:D2)\n",
   "created_at": "2026-01-21T00:00:00",
-  "expires_at": "2026-01-21T00:30:00"
+  "expires_at": "2026-01-21T00:30:00",
+  "dry_run": false
 }
+```
+
+**Safety Features (NEW):**
+
+The preview endpoint includes comprehensive safety validation:
+
+- **Hard Limits**: Operations exceeding configured limits (cells, sheets, formula length) are blocked
+- **Risk Assessment**: Operations are classified as low/medium/high risk based on scope
+- **Scope Analysis**: Detailed analysis showing affected sheets, columns, rows, and estimated duration
+- **Preview Requirement**: Large operations (> threshold) require explicit preview before execution
+- **Automatic Blocking**: Operations exceeding hard limits are automatically rejected with clear error messages
+
+Configuration options (via environment variables):
+```bash
+MAX_CELLS_PER_OPERATION=500          # Maximum cells per operation
+MAX_SHEETS_PER_OPERATION=40          # Maximum sheets per operation
+MAX_FORMULA_LENGTH=50000             # Maximum formula length
+REQUIRE_PREVIEW_ABOVE_CELLS=10       # Preview required above this threshold
+PREVIEW_TTL_SECONDS=300              # Preview expiration (5 minutes)
 ```
 
 ### POST `/api/ops/apply`
@@ -193,11 +213,49 @@ curl -X POST http://localhost:8000/api/ops/preview \
   }'
 ```
 
-## Audit Trail
+## Audit Trail (Enhanced)
 
-All applied operations are logged to the audit trail with:
-- Timestamp
-- Operation type
+All applied operations are automatically logged to the audit trail with comprehensive details:
+
+**Logged Information:**
+- Timestamp and duration
+- Operation type and status (success/failed/cancelled)
+- Spreadsheet ID and user
+- Preview ID (if applicable)
+- Scope details (cells, sheets affected)
+- Changes applied count
+- Error messages (if any)
+
+**Accessing Audit Logs:**
+
+```bash
+# Get recent audit logs
+GET /api/audit-logs?limit=50
+
+# Filter by spreadsheet
+GET /api/audit-logs?spreadsheet_id=your-id&limit=100
+```
+
+**Response:**
+```json
+{
+  "count": 2,
+  "logs": [
+    {
+      "id": "audit-123",
+      "timestamp": "2026-01-21T20:00:00",
+      "action": "replace_in_formulas",
+      "spreadsheet_id": "sheet-456",
+      "description": "replace_in_formulas - success",
+      "changes_applied": 15
+    }
+  ]
+}
+```
+
+## Safety Limits
+
+The following safety limits are enforced (configurable via environment variables):
 - Spreadsheet ID
 - Description
 - Number of changes applied
