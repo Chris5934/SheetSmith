@@ -46,9 +46,7 @@ class PlaceholderParser:
 
         return placeholders
 
-    def _parse_placeholder(
-        self, text: str, start_pos: int, end_pos: int
-    ) -> Optional[Placeholder]:
+    def _parse_placeholder(self, text: str, start_pos: int, end_pos: int) -> Optional[Placeholder]:
         """
         Parse a single placeholder text and create a Placeholder object.
 

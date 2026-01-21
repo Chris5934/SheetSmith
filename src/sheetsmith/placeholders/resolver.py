@@ -5,8 +5,6 @@ from typing import Optional
 
 from ..mapping import (
     MappingManager,
-    HeaderNotFoundError,
-    DisambiguationRequiredError,
 )
 from ..sheets import GoogleSheetsClient
 from .models import (
@@ -77,9 +75,7 @@ class PlaceholderResolver:
             DisambiguationRequiredError: If multiple headers match
         """
         if placeholder.type == PlaceholderType.HEADER:
-            return await self._resolve_header_placeholder(
-                placeholder, spreadsheet_id, context
-            )
+            return await self._resolve_header_placeholder(placeholder, spreadsheet_id, context)
 
         elif placeholder.type == PlaceholderType.INTERSECTION:
             return await self._resolve_intersection_placeholder(
@@ -87,14 +83,10 @@ class PlaceholderResolver:
             )
 
         elif placeholder.type == PlaceholderType.CROSS_SHEET:
-            return await self._resolve_cross_sheet_placeholder(
-                placeholder, spreadsheet_id, context
-            )
+            return await self._resolve_cross_sheet_placeholder(placeholder, spreadsheet_id, context)
 
         elif placeholder.type == PlaceholderType.VARIABLE:
-            return await self._resolve_variable_placeholder(
-                placeholder, spreadsheet_id, context
-            )
+            return await self._resolve_variable_placeholder(placeholder, spreadsheet_id, context)
 
         else:
             raise ValueError(f"Unknown placeholder type: {placeholder.type}")

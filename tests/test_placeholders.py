@@ -3,7 +3,7 @@
 import pytest
 import pytest_asyncio
 from pathlib import Path
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock
 
 from sheetsmith.placeholders import (
     PlaceholderParser,
@@ -12,7 +12,6 @@ from sheetsmith.placeholders import (
     Placeholder,
     PlaceholderType,
     ResolutionContext,
-    ResolvedFormula,
 )
 from sheetsmith.placeholders.syntax import (
     normalize_name,
@@ -22,8 +21,6 @@ from sheetsmith.placeholders.syntax import (
 from sheetsmith.mapping import (
     MappingManager,
     MappingStorage,
-    ColumnMapping,
-    CellMapping,
 )
 from sheetsmith.sheets.models import CellData, SheetRange
 

@@ -1,8 +1,7 @@
 """Data models for placeholder mapping system."""
 
-from datetime import datetime
 from enum import Enum
-from typing import Optional, Any
+from typing import Optional
 from pydantic import BaseModel, Field
 
 
