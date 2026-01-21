@@ -8,7 +8,10 @@ from datetime import datetime
 from ..sheets import GoogleSheetsClient, BatchUpdate, CellUpdate
 from ..engine.safety import SafetyValidator
 from .models import ApplyRequest, ApplyResponse, PreviewResponse, ChangeSpec
+from .safety_checker import SafetyChecker
+from .safety_models import ScopeSummary
 from ..memory import MemoryStore, AuditLog
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +23,15 @@ class ApplyEngine:
         self,
         sheets_client: Optional[GoogleSheetsClient] = None,
         memory_store: Optional[MemoryStore] = None,
+        safety_checker: Optional[SafetyChecker] = None,
     ):
         self.sheets_client = sheets_client or GoogleSheetsClient()
         self.memory_store = memory_store
         self.safety_validator = SafetyValidator()
+        self.safety_checker = safety_checker or SafetyChecker(self.sheets_client)
 
     async def apply_changes(
-        self, preview: PreviewResponse, confirmation: bool = False
+        self, preview: PreviewResponse, confirmation: bool = False, dry_run: bool = False
     ) -> ApplyResponse:
         """
         Apply the changes from a preview.
@@ -34,11 +39,14 @@ class ApplyEngine:
         Args:
             preview: The preview containing changes to apply
             confirmation: User confirmation (required for operations requiring approval)
+            dry_run: If True, perform validation but don't actually write to spreadsheet
             
         Returns:
             ApplyResponse with results
         """
-        logger.info(f"Applying changes from preview {preview.preview_id}")
+        logger.info(
+            f"Applying changes from preview {preview.preview_id} (dry_run={dry_run})"
+        )
         
         # Validate that preview hasn't expired
         if datetime.utcnow() > preview.expires_at:
@@ -63,7 +71,26 @@ class ApplyEngine:
                 ],
             )
         
-        # Validate safety constraints
+        # Re-run safety checks before apply (double-check)
+        scope_summary = self._preview_to_scope_summary(preview)
+        safety_check = self.safety_checker.check_operation_safety(
+            Operation(
+                operation_type=preview.operation_type,
+                description=preview.description,
+            ),
+            scope_summary
+        )
+        
+        if not safety_check.passed:
+            return ApplyResponse(
+                success=False,
+                preview_id=preview.preview_id,
+                spreadsheet_id=preview.spreadsheet_id,
+                cells_updated=0,
+                errors=safety_check.errors,
+            )
+        
+        # Also validate with legacy safety constraints for backwards compatibility
         is_safe, violations = self.safety_validator.validate_operation(
             cells_affected=preview.scope.total_cells,
             sheets_affected=preview.scope.sheet_count,
@@ -77,6 +104,24 @@ class ApplyEngine:
                 spreadsheet_id=preview.spreadsheet_id,
                 cells_updated=0,
                 errors=error_messages,
+            )
+        
+        # Dry-run mode: skip actual application
+        if dry_run:
+            logger.info("Dry-run mode: skipping actual application to spreadsheet")
+            
+            # Log dry-run to audit trail if memory store is available
+            audit_log_id = None
+            if self.memory_store:
+                audit_log_id = await self._log_dry_run_to_audit_trail(preview)
+            
+            return ApplyResponse(
+                success=True,
+                preview_id=preview.preview_id,
+                spreadsheet_id=preview.spreadsheet_id,
+                cells_updated=len(preview.changes),
+                errors=[],
+                audit_log_id=audit_log_id,
             )
         
         # Apply changes
@@ -170,3 +215,70 @@ class ApplyEngine:
         except Exception as e:
             logger.error(f"Failed to log to audit trail: {e}")
             return None
+
+    async def _log_dry_run_to_audit_trail(
+        self, preview: PreviewResponse
+    ) -> Optional[str]:
+        """Log a dry-run operation to the audit trail."""
+        if not self.memory_store:
+            return None
+        
+        try:
+            audit_log = AuditLog(
+                id=str(uuid.uuid4()),
+                timestamp=datetime.utcnow(),
+                action=f"ops_{preview.operation_type.value}_dry_run",
+                spreadsheet_id=preview.spreadsheet_id,
+                description=f"[DRY RUN] {preview.description}",
+                details={
+                    "preview_id": preview.preview_id,
+                    "operation_type": preview.operation_type.value,
+                    "dry_run": True,
+                    "scope": {
+                        "total_cells": preview.scope.total_cells,
+                        "affected_sheets": preview.scope.affected_sheets,
+                        "affected_headers": preview.scope.affected_headers,
+                    },
+                },
+                user_approved=True,
+                changes_applied=0,  # No actual changes in dry-run
+            )
+            
+            await self.memory_store.store_audit_log(audit_log)
+            logger.info(f"Logged dry-run operation to audit trail: {audit_log.id}")
+            return audit_log.id
+        
+        except Exception as e:
+            logger.error(f"Failed to log dry-run to audit trail: {e}")
+            return None
+
+    def _preview_to_scope_summary(self, preview: PreviewResponse) -> ScopeSummary:
+        """Convert preview to scope summary for safety checks."""
+        # Calculate row ranges from changes
+        row_ranges = {}
+        for change in preview.changes:
+            sheet = change.sheet_name
+            cell = change.cell
+            try:
+                row_num = int(''.join(filter(str.isdigit, cell)))
+                if sheet not in row_ranges:
+                    row_ranges[sheet] = [row_num, row_num]
+                else:
+                    row_ranges[sheet][0] = min(row_ranges[sheet][0], row_num)
+                    row_ranges[sheet][1] = max(row_ranges[sheet][1], row_num)
+            except (ValueError, IndexError):
+                pass
+        
+        row_range_by_sheet = {
+            sheet: tuple(range_list) for sheet, range_list in row_ranges.items()
+        }
+        
+        return ScopeSummary(
+            total_cells=preview.scope.total_cells,
+            total_sheets=preview.scope.sheet_count,
+            sheet_names=preview.scope.affected_sheets,
+            headers_affected=preview.scope.affected_headers,
+            row_range_by_sheet=row_range_by_sheet,
+            formula_patterns_matched=[],
+            estimated_duration_seconds=0.0,
+        )

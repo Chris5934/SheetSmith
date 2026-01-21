@@ -10,6 +10,14 @@ from .models import (
     ApplyResponse,
     OperationType,
 )
+from .safety_models import (
+    PreviewDiff,
+    ScopeSummary,
+    SafetyCheck,
+    MappingAuditEntry,
+    AuditReport,
+)
+from .safety_checker import SafetyChecker
 
 __all__ = [
     "DeterministicOpsEngine",
@@ -20,4 +28,11 @@ __all__ = [
     "ApplyRequest",
     "ApplyResponse",
     "OperationType",
+    # Safety models
+    "PreviewDiff",
+    "ScopeSummary",
+    "SafetyCheck",
+    "MappingAuditEntry",
+    "AuditReport",
+    "SafetyChecker",
 ]

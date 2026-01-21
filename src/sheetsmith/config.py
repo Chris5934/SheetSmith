@@ -69,5 +69,11 @@ class Settings(BaseModel):
     alert_on_high_cost: bool = os.getenv("ALERT_ON_HIGH_COST", "true").lower() == "true"
     high_cost_threshold_cents: float = float(os.getenv("HIGH_COST_THRESHOLD_CENTS", "1.0"))
 
+    # Safety and preview settings
+    preview_ttl_seconds: int = int(os.getenv("PREVIEW_TTL_SECONDS", "300"))  # 5 minutes
+    enable_dry_run: bool = os.getenv("ENABLE_DRY_RUN", "true").lower() == "true"
+    auto_audit_on_connect: bool = os.getenv("AUTO_AUDIT_ON_CONNECT", "true").lower() == "true"
+    max_preview_diffs_displayed: int = int(os.getenv("MAX_PREVIEW_DIFFS_DISPLAYED", "100"))
+
 
 settings = Settings()
