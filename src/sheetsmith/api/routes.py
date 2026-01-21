@@ -1,6 +1,6 @@
 """API routes for SheetSmith."""
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException
 
@@ -14,6 +14,10 @@ from ..ops import (
 from ..ops.safety_models import ScopeSummary
 from ..ops.models import Operation, OperationType
 
+if TYPE_CHECKING:
+    from ..mapping import MappingManager, DisambiguationResponse
+    from ..placeholders import PlaceholderResolver
+
 router = APIRouter()
 
 # Global ops engine instance
@@ -25,6 +29,7 @@ def get_ops_engine() -> DeterministicOpsEngine:
     global _ops_engine
     if _ops_engine is None:
         from .app import get_agent
+
         agent = get_agent()
         _ops_engine = DeterministicOpsEngine(
             sheets_client=agent.sheets_client,
@@ -101,14 +106,14 @@ class LogicBlockCreateRequest(BaseModel):
 
 class PreflightRequest(BaseModel):
     """Request for preflight safety check without full preview."""
-    
+
     spreadsheet_id: str
     operation: dict  # Operation model as dict
 
 
 class OpsAuditRequest(BaseModel):
     """Request to audit operations system health."""
-    
+
     spreadsheet_id: str
     check_mappings: bool = True
     check_cache: bool = True
@@ -364,7 +369,7 @@ async def health_check():
 async def get_config_limits():
     """Get safety limits and cost configuration."""
     from ..config import settings
-    
+
     return {
         "safety_limits": {
             "max_cells_per_operation": settings.max_cells_per_operation,
@@ -433,13 +438,13 @@ async def reset_costs():
 async def ops_search(request: SearchRequest):
     """
     Search for cells matching criteria.
-    
+
     This deterministic operation searches by:
     - Header name (never by column letter)
     - Row label/identifier
     - Formula pattern (exact or regex)
     - Value pattern
-    
+
     No LLM usage - pure deterministic search.
     """
     ops_engine = get_ops_engine()
@@ -476,25 +481,24 @@ async def ops_search(request: SearchRequest):
 async def ops_preview(request: PreviewRequest):
     """
     Generate preview of proposed changes.
-    
+
     Shows:
     - Before/after values for each affected cell
     - Clear scope summary (sheets, cells, headers affected)
     - Location info for every change
     - Safety check results
-    
+
     Query parameters:
     - dry_run: If true, only validate without storing for apply
-    
+
     Returns a preview_id for use with /ops/apply.
     """
-    from fastapi import Query
-    
+
     ops_engine = get_ops_engine()
-    
+
     # Extract dry_run from request if it has it, otherwise default to False
-    dry_run = getattr(request, 'dry_run', False)
-    
+    dry_run = getattr(request, "dry_run", False)
+
     try:
         preview = ops_engine.generate_preview(
             spreadsheet_id=request.spreadsheet_id,
@@ -539,18 +543,18 @@ async def ops_preview(request: PreviewRequest):
 async def ops_apply(request: ApplyRequest):
     """
     Apply previously previewed changes.
-    
+
     Requires:
     - preview_id from /ops/preview
     - confirmation=true for operations affecting many cells
-    
+
     Validates:
     - Preview hasn't expired
     - Safety limits are respected
-    
+
     Query parameters:
     - dry_run: If true, validate but don't actually write to spreadsheet
-    
+
     Returns:
     - Success status
     - Number of cells updated
@@ -561,7 +565,7 @@ async def ops_apply(request: ApplyRequest):
         result = await ops_engine.apply_changes(
             preview_id=request.preview_id,
             confirmation=request.confirmation,
-            dry_run=getattr(request, 'dry_run', False),
+            dry_run=getattr(request, "dry_run", False),
         )
         return {
             "success": result.success,
@@ -571,7 +575,7 @@ async def ops_apply(request: ApplyRequest):
             "errors": result.errors,
             "audit_log_id": result.audit_log_id,
             "applied_at": result.applied_at.isoformat(),
-            "dry_run": getattr(request, 'dry_run', False),
+            "dry_run": getattr(request, "dry_run", False),
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -581,31 +585,31 @@ async def ops_apply(request: ApplyRequest):
 async def ops_preflight(request: PreflightRequest):
     """
     Run preflight safety checks without generating full preview.
-    
+
     Performs quick validation:
     - Check hard limits (cells, sheets, formula length)
     - Detect ambiguities (duplicate headers)
     - Estimate scope and duration
-    
+
     Returns safety check results without creating a preview.
     """
     ops_engine = get_ops_engine()
     safety_checker = SafetyChecker(ops_engine.sheets_client)
-    
+
     try:
         # Parse operation from dict
         operation = Operation(**request.operation)
-        
+
         # Extract sheet names if available
         sheet_names = []
         if operation.search_criteria and operation.search_criteria.sheet_names:
             sheet_names = operation.search_criteria.sheet_names
-        
+
         # Extract header name if available
         headers_affected = []
         if operation.header_name:
             headers_affected.append(operation.header_name)
-        
+
         # Create minimal scope summary for preflight
         # In a real implementation, would do a quick search to estimate scope
         scope = ScopeSummary(
@@ -615,10 +619,10 @@ async def ops_preflight(request: PreflightRequest):
             headers_affected=headers_affected,
             formula_patterns_matched=[operation.find_pattern] if operation.find_pattern else [],
         )
-        
+
         # Run safety checks
         safety_check = safety_checker.check_operation_safety(operation, scope)
-        
+
         return {
             "passed": safety_check.passed,
             "warnings": safety_check.warnings,
@@ -640,21 +644,21 @@ async def ops_preflight(request: PreflightRequest):
 async def audit_ops_mappings(spreadsheet_id: str):
     """
     Audit mapping health for operations system.
-    
+
     Checks:
     - Cached header mappings are still valid
     - No duplicate headers within sheets
     - No orphaned mappings
-    
+
     Returns detailed audit report with recommendations.
     """
     ops_engine = get_ops_engine()
     safety_checker = SafetyChecker(ops_engine.sheets_client)
-    
+
     try:
         # Run mapping validation
         report = safety_checker.validate_mappings(spreadsheet_id)
-        
+
         return {
             "timestamp": report.timestamp,
             "spreadsheet_id": report.spreadsheet_id,
@@ -689,6 +693,7 @@ def get_mapping_manager():
     global _mapping_manager
     if _mapping_manager is None:
         from ..mapping import MappingManager
+
         agent = get_agent()
         _mapping_manager = MappingManager(sheets_client=agent.sheets_client)
     return _mapping_manager
@@ -696,7 +701,7 @@ def get_mapping_manager():
 
 class ValidateMappingRequest(BaseModel):
     """Request to validate a specific mapping."""
-    
+
     mapping_id: int
     mapping_type: str = "column"  # "column" or "cell"
 
@@ -705,7 +710,7 @@ class ValidateMappingRequest(BaseModel):
 async def audit_mappings(spreadsheet_id: str):
     """
     Audit all mappings for a spreadsheet.
-    
+
     Returns health status of all cached mappings:
     - ✅ valid: Header exists in expected position
     - ⚠️ moved: Header exists but in different position
@@ -713,11 +718,11 @@ async def audit_mappings(spreadsheet_id: str):
     - ⚠️ ambiguous: Multiple columns with same header
     """
     manager = get_mapping_manager()
-    
+
     # Ensure manager is initialized
     if not manager._initialized:
         await manager.initialize()
-    
+
     try:
         report = await manager.audit_mappings(spreadsheet_id)
         return {
@@ -741,9 +746,7 @@ async def audit_mappings(spreadsheet_id: str):
                     "status": entry.status.value,
                     "needs_action": entry.needs_action,
                     "last_validated_at": (
-                        entry.last_validated_at.isoformat()
-                        if entry.last_validated_at
-                        else None
+                        entry.last_validated_at.isoformat() if entry.last_validated_at else None
                     ),
                 }
                 for entry in report.entries
@@ -758,21 +761,20 @@ async def audit_mappings(spreadsheet_id: str):
 async def disambiguate_column(request: "DisambiguationResponse"):
     """
     Store user's column disambiguation choice.
-    
+
     When multiple columns share the same header, the system returns a
     disambiguation request. Use this endpoint to specify which column to use.
-    
+
     The request_id comes from the DisambiguationRequiredError, and
     selected_column_index is the index in the candidates array.
     """
-    from ..mapping import DisambiguationResponse
-    
+
     manager = get_mapping_manager()
-    
+
     # Ensure manager is initialized
     if not manager._initialized:
         await manager.initialize()
-    
+
     try:
         mapping = await manager.store_disambiguation(request)
         return {
@@ -796,17 +798,17 @@ async def disambiguate_column(request: "DisambiguationResponse"):
 async def delete_mapping(mapping_id: int, mapping_type: str = "column"):
     """
     Delete a mapping.
-    
+
     Args:
         mapping_id: The mapping ID to delete
         mapping_type: "column" or "cell" (default: "column")
     """
     manager = get_mapping_manager()
-    
+
     # Ensure manager is initialized
     if not manager._initialized:
         await manager.initialize()
-    
+
     try:
         deleted = await manager.delete_mapping(mapping_id, mapping_type)
         if not deleted:
@@ -820,19 +822,321 @@ async def delete_mapping(mapping_id: int, mapping_type: str = "column"):
 async def validate_mapping(request: ValidateMappingRequest):
     """
     Validate a specific mapping.
-    
+
     Checks if the mapping is still accurate and returns current status.
     """
     manager = get_mapping_manager()
-    
+
     # Ensure manager is initialized
     if not manager._initialized:
         await manager.initialize()
-    
+
     try:
-        result = await manager.validate_mapping(
-            request.mapping_id, request.mapping_type
-        )
+        result = await manager.validate_mapping(request.mapping_id, request.mapping_type)
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Placeholder Mapping endpoints
+
+# Global placeholder resolver instance
+_placeholder_resolver: Optional["PlaceholderResolver"] = None
+
+
+def get_placeholder_resolver():
+    """Get the global placeholder resolver instance."""
+    global _placeholder_resolver
+    if _placeholder_resolver is None:
+        from ..placeholders import PlaceholderResolver
+
+        agent = get_agent()
+        mapping_manager = get_mapping_manager()
+        _placeholder_resolver = PlaceholderResolver(
+            sheets_client=agent.sheets_client,
+            mapping_manager=mapping_manager,
+        )
+    return _placeholder_resolver
+
+
+class PlaceholderParseRequest(BaseModel):
+    """Request to parse placeholders from a formula."""
+
+    formula: str
+    spreadsheet_id: str
+    sheet_name: str
+    target_row: int = 2
+
+
+class PlaceholderResolveRequest(BaseModel):
+    """Request to resolve placeholders in a formula."""
+
+    formula: str
+    spreadsheet_id: str
+    sheet_name: str
+    target_row: int = 2
+    absolute_references: bool = False
+
+
+class PlaceholderApplyRequest(BaseModel):
+    """Request to apply a formula with placeholders."""
+
+    formula: str
+    spreadsheet_id: str
+    target: dict  # {"sheet_name": str, "header": str, "rows": list[int]}
+
+
+@router.post("/placeholders/parse")
+async def parse_placeholders(request: PlaceholderParseRequest):
+    """
+    Parse formula and extract placeholders.
+
+    Returns:
+    - List of detected placeholders with type information
+    - Validation results (syntax errors, warnings)
+    """
+    from ..placeholders import PlaceholderParser
+
+    try:
+        parser = PlaceholderParser()
+
+        # Extract placeholders
+        placeholders = parser.extract_placeholders(request.formula)
+
+        # Validate syntax
+        validation = parser.validate_syntax(request.formula)
+
+        return {
+            "placeholders": [
+                {
+                    "name": p.name,
+                    "type": p.type.value,
+                    "syntax": p.syntax,
+                    "sheet": p.sheet,
+                    "row_label": p.row_label,
+                }
+                for p in placeholders
+            ],
+            "validation": {
+                "valid": validation.valid,
+                "errors": validation.errors,
+                "warnings": validation.warnings,
+            },
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/placeholders/resolve")
+async def resolve_placeholders(request: PlaceholderResolveRequest):
+    """
+    Resolve placeholders to cell references.
+
+    Returns:
+    - Resolved formula with cell references
+    - Mapping of each placeholder to its resolved cell
+    - Any warnings during resolution
+    """
+    from ..placeholders import ResolutionContext
+    from ..mapping import HeaderNotFoundError, DisambiguationRequiredError
+
+    resolver = get_placeholder_resolver()
+
+    # Ensure resolver is initialized
+    if not resolver._initialized:
+        await resolver.initialize()
+
+    try:
+        # Create resolution context
+        context = ResolutionContext(
+            current_sheet=request.sheet_name,
+            current_row=request.target_row,
+            spreadsheet_id=request.spreadsheet_id,
+            absolute_references=request.absolute_references,
+        )
+
+        # Resolve all placeholders
+        resolved = await resolver.resolve_all(
+            formula=request.formula,
+            spreadsheet_id=request.spreadsheet_id,
+            context=context,
+        )
+
+        return {
+            "resolved_formula": resolved.resolved,
+            "mappings": [
+                {
+                    "placeholder": m.placeholder,
+                    "resolved_to": m.resolved_to,
+                    "header": m.header,
+                    "column": m.column,
+                    "row": m.row,
+                    "confidence": m.confidence,
+                    "sheet_name": m.sheet_name,
+                }
+                for m in resolved.mappings
+            ],
+            "warnings": resolved.warnings,
+        }
+    except HeaderNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except DisambiguationRequiredError as e:
+        # Return disambiguation request for client to handle
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "disambiguation_required",
+                "message": str(e),
+                "request_id": e.request.request_id,
+                "header_text": e.request.header_text,
+                "candidates": [
+                    {
+                        "column_letter": c.column_letter,
+                        "column_index": c.column_index,
+                        "header_row": c.header_row,
+                        "sample_values": c.sample_values,
+                        "adjacent_headers": c.adjacent_headers,
+                    }
+                    for c in e.request.candidates
+                ],
+            },
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/placeholders/preview")
+async def preview_placeholders(request: PlaceholderParseRequest):
+    """
+    Preview placeholder mappings without resolving.
+
+    Shows potential matches for each placeholder to help users
+    verify mappings before applying.
+    """
+    resolver = get_placeholder_resolver()
+
+    # Ensure resolver is initialized
+    if not resolver._initialized:
+        await resolver.initialize()
+
+    try:
+        preview = await resolver.preview_mappings(
+            formula=request.formula,
+            spreadsheet_id=request.spreadsheet_id,
+            sheet_name=request.sheet_name,
+        )
+
+        return {
+            "formula": preview.formula,
+            "placeholders": [
+                {
+                    "name": p.name,
+                    "type": p.type.value,
+                    "syntax": p.syntax,
+                    "sheet": p.sheet,
+                    "row_label": p.row_label,
+                }
+                for p in preview.placeholders
+            ],
+            "potential_mappings": preview.potential_mappings,
+            "requires_disambiguation": preview.requires_disambiguation,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/placeholders/apply")
+async def apply_placeholder_formula(request: PlaceholderApplyRequest):
+    """
+    Apply a formula with placeholders using the deterministic ops engine.
+
+    This endpoint:
+    1. Resolves all placeholders to cell references
+    2. Creates an operation for the deterministic engine
+    3. Generates a preview
+    4. Returns preview_id for use with /ops/apply
+
+    The user must then call /ops/apply to actually apply the changes.
+    """
+    from ..placeholders import ResolutionContext
+    from ..ops.models import Operation
+
+    resolver = get_placeholder_resolver()
+    ops_engine = get_ops_engine()
+
+    # Ensure resolver is initialized
+    if not resolver._initialized:
+        await resolver.initialize()
+
+    try:
+        target = request.target
+        sheet_name = target.get("sheet_name")
+        header_name = target.get("header")
+        target_rows = target.get("rows", [])
+
+        if not sheet_name or not header_name or not target_rows:
+            raise HTTPException(
+                status_code=400,
+                detail="Target must include sheet_name, header, and rows",
+            )
+
+        # Resolve placeholders for first row to get the formula
+        context = ResolutionContext(
+            current_sheet=sheet_name,
+            current_row=target_rows[0],
+            spreadsheet_id=request.spreadsheet_id,
+            absolute_references=False,  # Use relative for row-by-row application
+        )
+
+        resolved = await resolver.resolve_all(
+            formula=request.formula,
+            spreadsheet_id=request.spreadsheet_id,
+            context=context,
+        )
+
+        # Create operation to apply the formula
+        operation = Operation(
+            type=OperationType.SET_FORMULA,
+            spreadsheet_id=request.spreadsheet_id,
+            sheet_name=sheet_name,
+            header_name=header_name,
+            rows=target_rows,
+            formula_template=resolved.resolved,
+            description=f"Apply placeholder formula to {header_name}",
+        )
+
+        # Generate preview using ops engine
+        from ..ops import PreviewRequest as OpsPreviewRequest
+
+        preview_request = OpsPreviewRequest(
+            spreadsheet_id=request.spreadsheet_id,
+            operation=operation,
+        )
+
+        preview = ops_engine.generate_preview(
+            spreadsheet_id=preview_request.spreadsheet_id,
+            operation=preview_request.operation,
+            dry_run=False,
+        )
+
+        return {
+            "preview_id": preview.preview_id,
+            "resolved_formula": resolved.resolved,
+            "original_formula": request.formula,
+            "mappings": [
+                {
+                    "placeholder": m.placeholder,
+                    "resolved_to": m.resolved_to,
+                    "header": m.header,
+                }
+                for m in resolved.mappings
+            ],
+            "scope": {
+                "total_cells": preview.scope.total_cells,
+                "affected_sheets": preview.scope.affected_sheets,
+                "affected_headers": preview.scope.affected_headers,
+            },
+            "message": "Preview ready. Use preview_id with /ops/apply to apply changes.",
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
