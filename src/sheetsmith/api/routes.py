@@ -836,3 +836,306 @@ async def validate_mapping(request: ValidateMappingRequest):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Placeholder Mapping endpoints
+
+# Global placeholder resolver instance
+_placeholder_resolver: Optional["PlaceholderResolver"] = None
+
+
+def get_placeholder_resolver():
+    """Get the global placeholder resolver instance."""
+    global _placeholder_resolver
+    if _placeholder_resolver is None:
+        from ..placeholders import PlaceholderResolver
+        agent = get_agent()
+        mapping_manager = get_mapping_manager()
+        _placeholder_resolver = PlaceholderResolver(
+            sheets_client=agent.sheets_client,
+            mapping_manager=mapping_manager,
+        )
+    return _placeholder_resolver
+
+
+class PlaceholderParseRequest(BaseModel):
+    """Request to parse placeholders from a formula."""
+    
+    formula: str
+    spreadsheet_id: str
+    sheet_name: str
+    target_row: int = 2
+
+
+class PlaceholderResolveRequest(BaseModel):
+    """Request to resolve placeholders in a formula."""
+    
+    formula: str
+    spreadsheet_id: str
+    sheet_name: str
+    target_row: int = 2
+    absolute_references: bool = False
+
+
+class PlaceholderApplyRequest(BaseModel):
+    """Request to apply a formula with placeholders."""
+    
+    formula: str
+    spreadsheet_id: str
+    target: dict  # {"sheet_name": str, "header": str, "rows": list[int]}
+
+
+@router.post("/placeholders/parse")
+async def parse_placeholders(request: PlaceholderParseRequest):
+    """
+    Parse formula and extract placeholders.
+    
+    Returns:
+    - List of detected placeholders with type information
+    - Validation results (syntax errors, warnings)
+    """
+    from ..placeholders import PlaceholderParser
+    
+    try:
+        parser = PlaceholderParser()
+        
+        # Extract placeholders
+        placeholders = parser.extract_placeholders(request.formula)
+        
+        # Validate syntax
+        validation = parser.validate_syntax(request.formula)
+        
+        return {
+            "placeholders": [
+                {
+                    "name": p.name,
+                    "type": p.type.value,
+                    "syntax": p.syntax,
+                    "sheet": p.sheet,
+                    "row_label": p.row_label,
+                }
+                for p in placeholders
+            ],
+            "validation": {
+                "valid": validation.valid,
+                "errors": validation.errors,
+                "warnings": validation.warnings,
+            },
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/placeholders/resolve")
+async def resolve_placeholders(request: PlaceholderResolveRequest):
+    """
+    Resolve placeholders to cell references.
+    
+    Returns:
+    - Resolved formula with cell references
+    - Mapping of each placeholder to its resolved cell
+    - Any warnings during resolution
+    """
+    from ..placeholders import ResolutionContext
+    from ..mapping import HeaderNotFoundError, DisambiguationRequiredError
+    
+    resolver = get_placeholder_resolver()
+    
+    # Ensure resolver is initialized
+    if not resolver._initialized:
+        await resolver.initialize()
+    
+    try:
+        # Create resolution context
+        context = ResolutionContext(
+            current_sheet=request.sheet_name,
+            current_row=request.target_row,
+            spreadsheet_id=request.spreadsheet_id,
+            absolute_references=request.absolute_references,
+        )
+        
+        # Resolve all placeholders
+        resolved = await resolver.resolve_all(
+            formula=request.formula,
+            spreadsheet_id=request.spreadsheet_id,
+            context=context,
+        )
+        
+        return {
+            "resolved_formula": resolved.resolved,
+            "mappings": [
+                {
+                    "placeholder": m.placeholder,
+                    "resolved_to": m.resolved_to,
+                    "header": m.header,
+                    "column": m.column,
+                    "row": m.row,
+                    "confidence": m.confidence,
+                    "sheet_name": m.sheet_name,
+                }
+                for m in resolved.mappings
+            ],
+            "warnings": resolved.warnings,
+        }
+    except HeaderNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except DisambiguationRequiredError as e:
+        # Return disambiguation request for client to handle
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "disambiguation_required",
+                "message": str(e),
+                "request_id": e.request.request_id,
+                "header_text": e.request.header_text,
+                "candidates": [
+                    {
+                        "column_letter": c.column_letter,
+                        "column_index": c.column_index,
+                        "header_row": c.header_row,
+                        "sample_values": c.sample_values,
+                        "adjacent_headers": c.adjacent_headers,
+                    }
+                    for c in e.request.candidates
+                ],
+            },
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/placeholders/preview")
+async def preview_placeholders(request: PlaceholderParseRequest):
+    """
+    Preview placeholder mappings without resolving.
+    
+    Shows potential matches for each placeholder to help users
+    verify mappings before applying.
+    """
+    resolver = get_placeholder_resolver()
+    
+    # Ensure resolver is initialized
+    if not resolver._initialized:
+        await resolver.initialize()
+    
+    try:
+        preview = await resolver.preview_mappings(
+            formula=request.formula,
+            spreadsheet_id=request.spreadsheet_id,
+            sheet_name=request.sheet_name,
+        )
+        
+        return {
+            "formula": preview.formula,
+            "placeholders": [
+                {
+                    "name": p.name,
+                    "type": p.type.value,
+                    "syntax": p.syntax,
+                    "sheet": p.sheet,
+                    "row_label": p.row_label,
+                }
+                for p in preview.placeholders
+            ],
+            "potential_mappings": preview.potential_mappings,
+            "requires_disambiguation": preview.requires_disambiguation,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/placeholders/apply")
+async def apply_placeholder_formula(request: PlaceholderApplyRequest):
+    """
+    Apply a formula with placeholders using the deterministic ops engine.
+    
+    This endpoint:
+    1. Resolves all placeholders to cell references
+    2. Creates an operation for the deterministic engine
+    3. Generates a preview
+    4. Returns preview_id for use with /ops/apply
+    
+    The user must then call /ops/apply to actually apply the changes.
+    """
+    from ..placeholders import ResolutionContext
+    from ..ops.models import Operation, OperationType
+    
+    resolver = get_placeholder_resolver()
+    ops_engine = get_ops_engine()
+    
+    # Ensure resolver is initialized
+    if not resolver._initialized:
+        await resolver.initialize()
+    
+    try:
+        target = request.target
+        sheet_name = target.get("sheet_name")
+        header_name = target.get("header")
+        target_rows = target.get("rows", [])
+        
+        if not sheet_name or not header_name or not target_rows:
+            raise HTTPException(
+                status_code=400,
+                detail="Target must include sheet_name, header, and rows",
+            )
+        
+        # Resolve placeholders for first row to get the formula
+        context = ResolutionContext(
+            current_sheet=sheet_name,
+            current_row=target_rows[0],
+            spreadsheet_id=request.spreadsheet_id,
+            absolute_references=False,  # Use relative for row-by-row application
+        )
+        
+        resolved = await resolver.resolve_all(
+            formula=request.formula,
+            spreadsheet_id=request.spreadsheet_id,
+            context=context,
+        )
+        
+        # Create operation to apply the formula
+        operation = Operation(
+            type=OperationType.SET_FORMULA,
+            spreadsheet_id=request.spreadsheet_id,
+            sheet_name=sheet_name,
+            header_name=header_name,
+            rows=target_rows,
+            formula_template=resolved.resolved,
+            description=f"Apply placeholder formula to {header_name}",
+        )
+        
+        # Generate preview using ops engine
+        from ..ops import PreviewRequest as OpsPreviewRequest
+        
+        preview_request = OpsPreviewRequest(
+            spreadsheet_id=request.spreadsheet_id,
+            operation=operation,
+        )
+        
+        preview = ops_engine.generate_preview(
+            spreadsheet_id=preview_request.spreadsheet_id,
+            operation=preview_request.operation,
+            dry_run=False,
+        )
+        
+        return {
+            "preview_id": preview.preview_id,
+            "resolved_formula": resolved.resolved,
+            "original_formula": request.formula,
+            "mappings": [
+                {
+                    "placeholder": m.placeholder,
+                    "resolved_to": m.resolved_to,
+                    "header": m.header,
+                }
+                for m in resolved.mappings
+            ],
+            "scope": {
+                "total_cells": preview.scope.total_cells,
+                "affected_sheets": preview.scope.affected_sheets,
+                "affected_headers": preview.scope.affected_headers,
+            },
+            "message": f"Preview ready. Use preview_id with /ops/apply to apply changes.",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
