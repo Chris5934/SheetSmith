@@ -77,6 +77,7 @@ class SheetSmithApp {
         // Modals
         this.previewModal = document.getElementById('preview-modal');
         this.previewContent = document.getElementById('preview-content');
+        this.previewMode = document.getElementById('preview-mode');
         this.previewScopeSummary = document.getElementById('preview-scope-summary');
         this.previewColumns = document.getElementById('preview-columns');
         this.previewSheets = document.getElementById('preview-sheets');
@@ -400,16 +401,104 @@ class SheetSmithApp {
             return;
         }
         
-        const operation = this.buildOperationFromForm();
-        if (!operation) {
-            this.showError('Please fill in all required fields');
-            return;
-        }
-        
         this.previewBtn.disabled = true;
         this.previewBtn.textContent = 'Generating...';
         
         try {
+            let preview;
+            
+            // Route based on current mode
+            if (this.currentMode === 'tools') {
+                preview = await this.generateDeterministicPreview();
+            } else {
+                preview = await this.generateAiAssistedPreview();
+            }
+            
+            this.currentPreview = preview;
+            this.showPreviewModal(preview);
+            this.addActivity(`Generated preview: ${preview.changes.length} changes`);
+        } catch (error) {
+            this.showError(error.message);
+        } finally {
+            this.previewBtn.disabled = false;
+            this.previewBtn.textContent = 'Preview Changes';
+        }
+    }
+    
+    async generateDeterministicPreview() {
+        const operationType = this.operationType?.value;
+        
+        if (operationType === 'replace_in_formulas') {
+            const header = this.headerName?.value.trim();
+            const findText = this.findText?.value.trim();
+            const replaceText = this.replaceText?.value.trim();
+            
+            if (!header || !findText || !replaceText) {
+                throw new Error('Please fill in header, find text, and replace text');
+            }
+            
+            const sheets = this.allSheets?.checked ? 
+                null : 
+                Array.from(document.querySelectorAll('.sheet-checkbox:checked')).map(cb => cb.value);
+            
+            const response = await fetch('/api/modes/deterministic/replace', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    spreadsheet_id: this.spreadsheetId,
+                    header_text: header,
+                    find: findText,
+                    replace: replaceText,
+                    sheet_names: sheets,
+                    case_sensitive: false,
+                    is_regex: this.matchType?.value === 'regex'
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to generate preview');
+            }
+            
+            return await response.json();
+        } else if (operationType === 'set_value_by_header') {
+            const header = document.getElementById('set-header-name')?.value.trim();
+            const rowLabel = document.getElementById('row-identifier')?.value.trim();
+            const newValue = document.getElementById('new-value')?.value;
+            
+            if (!header || !rowLabel || newValue === null || newValue === undefined || newValue === '') {
+                throw new Error('Please fill in header, row identifier, and new value');
+            }
+            
+            // For set_value, we need a sheet name
+            // If "all sheets" is checked, we'd need to iterate or error
+            const sheetName = this.spreadsheetInfo?.sheets?.[0]?.title || 'Sheet1';
+            
+            const response = await fetch('/api/modes/deterministic/set_value', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    spreadsheet_id: this.spreadsheetId,
+                    sheet_name: sheetName,
+                    header: header,
+                    row_label: rowLabel,
+                    value: newValue
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to generate preview');
+            }
+            
+            return await response.json();
+        } else {
+            // Fallback to old endpoint for other operation types
+            const operation = this.buildOperationFromForm();
+            if (!operation) {
+                throw new Error('Please fill in all required fields');
+            }
+            
             const response = await fetch('/api/ops/preview', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -424,16 +513,13 @@ class SheetSmithApp {
                 throw new Error(error.detail || 'Failed to generate preview');
             }
             
-            const preview = await response.json();
-            this.currentPreview = preview;
-            this.showPreviewModal(preview);
-            this.addActivity(`Generated preview: ${preview.changes.length} changes`);
-        } catch (error) {
-            this.showError(error.message);
-        } finally {
-            this.previewBtn.disabled = false;
-            this.previewBtn.textContent = 'Preview Changes';
+            return await response.json();
         }
+    }
+    
+    async generateAiAssistedPreview() {
+        // This would integrate with AI assist mode
+        throw new Error('AI-assist mode not yet fully implemented');
     }
 
     buildOperationFromForm() {
@@ -472,6 +558,12 @@ class SheetSmithApp {
 
     showPreviewModal(preview) {
         if (!this.previewModal) return;
+        
+        // Update mode indicator
+        if (this.previewMode) {
+            const modeText = this.currentMode === 'tools' ? 'Deterministic ($0.00)' : 'AI Assist';
+            this.previewMode.textContent = modeText;
+        }
         
         // Update scope info
         if (this.previewScopeSummary) {
