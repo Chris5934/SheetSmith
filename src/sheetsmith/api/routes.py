@@ -520,3 +520,163 @@ async def ops_apply(request: ApplyRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# Header-Based Mapping endpoints
+
+# Global mapping manager instance
+_mapping_manager: Optional["MappingManager"] = None
+
+
+def get_mapping_manager():
+    """Get the global mapping manager instance."""
+    global _mapping_manager
+    if _mapping_manager is None:
+        from ..mapping import MappingManager
+        agent = get_agent()
+        _mapping_manager = MappingManager(sheets_client=agent.sheets_client)
+    return _mapping_manager
+
+
+class ValidateMappingRequest(BaseModel):
+    """Request to validate a specific mapping."""
+    
+    mapping_id: int
+    mapping_type: str = "column"  # "column" or "cell"
+
+
+@router.get("/mappings/{spreadsheet_id}/audit")
+async def audit_mappings(spreadsheet_id: str):
+    """
+    Audit all mappings for a spreadsheet.
+    
+    Returns health status of all cached mappings:
+    - ✅ valid: Header exists in expected position
+    - ⚠️ moved: Header exists but in different position
+    - ❌ missing: Header not found in sheet
+    - ⚠️ ambiguous: Multiple columns with same header
+    """
+    manager = get_mapping_manager()
+    
+    # Ensure manager is initialized
+    if not manager._initialized:
+        await manager.initialize()
+    
+    try:
+        report = await manager.audit_mappings(spreadsheet_id)
+        return {
+            "spreadsheet_id": report.spreadsheet_id,
+            "spreadsheet_title": report.spreadsheet_title,
+            "total_mappings": report.total_mappings,
+            "summary": {
+                "valid": report.valid_count,
+                "moved": report.moved_count,
+                "missing": report.missing_count,
+                "ambiguous": report.ambiguous_count,
+            },
+            "entries": [
+                {
+                    "mapping_id": entry.mapping_id,
+                    "mapping_type": entry.mapping_type,
+                    "sheet_name": entry.sheet_name,
+                    "header_text": entry.header_text,
+                    "row_label": entry.row_label,
+                    "current_address": entry.current_address,
+                    "status": entry.status.value,
+                    "needs_action": entry.needs_action,
+                    "last_validated_at": (
+                        entry.last_validated_at.isoformat()
+                        if entry.last_validated_at
+                        else None
+                    ),
+                }
+                for entry in report.entries
+            ],
+            "generated_at": report.generated_at.isoformat(),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/mappings/disambiguate")
+async def disambiguate_column(request: "DisambiguationResponse"):
+    """
+    Store user's column disambiguation choice.
+    
+    When multiple columns share the same header, the system returns a
+    disambiguation request. Use this endpoint to specify which column to use.
+    
+    The request_id comes from the DisambiguationRequiredError, and
+    selected_column_index is the index in the candidates array.
+    """
+    from ..mapping import DisambiguationResponse
+    
+    manager = get_mapping_manager()
+    
+    # Ensure manager is initialized
+    if not manager._initialized:
+        await manager.initialize()
+    
+    try:
+        mapping = await manager.store_disambiguation(request)
+        return {
+            "success": True,
+            "mapping": {
+                "id": mapping.id,
+                "spreadsheet_id": mapping.spreadsheet_id,
+                "sheet_name": mapping.sheet_name,
+                "header_text": mapping.header_text,
+                "column_letter": mapping.column_letter,
+                "column_index": mapping.column_index,
+            },
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/mappings/{mapping_id}")
+async def delete_mapping(mapping_id: int, mapping_type: str = "column"):
+    """
+    Delete a mapping.
+    
+    Args:
+        mapping_id: The mapping ID to delete
+        mapping_type: "column" or "cell" (default: "column")
+    """
+    manager = get_mapping_manager()
+    
+    # Ensure manager is initialized
+    if not manager._initialized:
+        await manager.initialize()
+    
+    try:
+        deleted = await manager.delete_mapping(mapping_id, mapping_type)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Mapping not found")
+        return {"status": "ok", "message": "Mapping deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/mappings/validate")
+async def validate_mapping(request: ValidateMappingRequest):
+    """
+    Validate a specific mapping.
+    
+    Checks if the mapping is still accurate and returns current status.
+    """
+    manager = get_mapping_manager()
+    
+    # Ensure manager is initialized
+    if not manager._initialized:
+        await manager.initialize()
+    
+    try:
+        result = await manager.validate_mapping(
+            request.mapping_id, request.mapping_type
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
