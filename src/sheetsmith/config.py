@@ -21,42 +21,42 @@ def _parse_cors_origins() -> list[str]:
 class Settings(BaseModel):
     """Application settings."""
 
-    # Google Sheets API
+    # Google Sheets API credentials
     google_credentials_path: Path = Path(os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials.json"))
     google_token_path: Path = Path(os.getenv("GOOGLE_TOKEN_PATH", "token.json"))
 
-    # LLM Provider settings
+    # LLM Provider settings ('anthropic' or 'openrouter')
     llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")
 
-    # Anthropic API
+    # Anthropic API key (required when LLM_PROVIDER=anthropic)
     anthropic_api_key: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
 
-    # OpenRouter API
+    # OpenRouter API configuration (required when LLM_PROVIDER=openrouter)
     openrouter_api_key: Optional[str] = os.getenv("OPENROUTER_API_KEY")
     openrouter_model: str = os.getenv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
 
-    # Database
+    # Database path for persistence
     database_path: Path = Path(os.getenv("DATABASE_PATH", "data/sheetsmith.db"))
 
-    # Server
+    # Server settings
     host: str = os.getenv("HOST", "127.0.0.1")
     port: int = int(os.getenv("PORT", "8000"))
     debug: bool = os.getenv("DEBUG", "false").lower() == "true"
 
-    # CORS settings
+    # CORS settings (comma-separated list of allowed origins, or * for all)
     cors_allow_origins: list[str] = _parse_cors_origins()
 
-    # Agent settings
+    # Agent settings - model configuration
     model_name: str = os.getenv("MODEL_NAME", "claude-sonnet-4-20250514")
     max_tokens: int = int(os.getenv("MAX_TOKENS", "4096"))
 
-    # Safety constraints
+    # Safety constraints - prevent expensive or dangerous operations
     max_cells_per_operation: int = int(os.getenv("MAX_CELLS_PER_OPERATION", "500"))
     max_sheets_per_operation: int = int(os.getenv("MAX_SHEETS_PER_OPERATION", "40"))
     max_formula_length: int = int(os.getenv("MAX_FORMULA_LENGTH", "50000"))
     require_preview_above_cells: int = int(os.getenv("REQUIRE_PREVIEW_ABOVE_CELLS", "10"))
 
-    # Model selection for different operations
+    # Model selection by operation type (for cost optimization)
     planning_model: str = os.getenv("PLANNING_MODEL", "")  # Empty means use main model
     parser_model: str = os.getenv("PARSER_MODEL", "anthropic/claude-3-haiku")
     ai_assist_model: str = os.getenv("AI_ASSIST_MODEL", "anthropic/claude-3-haiku")
@@ -71,19 +71,21 @@ class Settings(BaseModel):
     spreadsheet_content_max_chars: int = int(os.getenv("SPREADSHEET_CONTENT_MAX_CHARS", "5000"))
     formula_sample_limit: int = int(os.getenv("FORMULA_SAMPLE_LIMIT", "5"))
     
-    # Operation mode settings
-    use_json_mode: bool = os.getenv("USE_JSON_MODE", "true").lower() == "true"  # Use JSON-only instead of tools
-    use_free_models: bool = os.getenv("USE_FREE_MODELS", "false").lower() == "true"  # Use :free suffix
+    # Cost Optimization Settings
+    use_json_mode: bool = os.getenv("USE_JSON_MODE", "true").lower() == "true"  # Enable JSON-only mode (no tool schemas sent to LLM)
+    use_free_models: bool = os.getenv("USE_FREE_MODELS", "false").lower() == "true"  # Use free models when available (adds :free suffix to OpenRouter models)
 
-    # Cost tracking and limits
-    enable_cost_logging: bool = os.getenv("ENABLE_COST_LOGGING", "true").lower() == "true"
-    cost_log_path: Path = Path(os.getenv("COST_LOG_PATH", "logs/llm_costs.jsonl"))
-    payload_max_chars: int = int(os.getenv("PAYLOAD_MAX_CHARS", "50000"))
-    max_input_tokens: int = int(os.getenv("MAX_INPUT_TOKENS", "100000"))
-    per_request_budget_cents: float = float(os.getenv("PER_REQUEST_BUDGET_CENTS", "5.0"))
-    session_budget_cents: float = float(os.getenv("SESSION_BUDGET_CENTS", "50.0"))
-    alert_on_high_cost: bool = os.getenv("ALERT_ON_HIGH_COST", "true").lower() == "true"
-    high_cost_threshold_cents: float = float(os.getenv("HIGH_COST_THRESHOLD_CENTS", "1.0"))
+    # Cost Tracking and Logging
+    enable_cost_logging: bool = os.getenv("ENABLE_COST_LOGGING", "true").lower() == "true"  # Log LLM API costs to file
+    cost_log_path: Path = Path(os.getenv("COST_LOG_PATH", "logs/llm_costs.jsonl"))  # Path to cost log file
+    
+    # Budget Guards - prevent runaway costs
+    payload_max_chars: int = int(os.getenv("PAYLOAD_MAX_CHARS", "50000"))  # Maximum characters in a single request payload
+    max_input_tokens: int = int(os.getenv("MAX_INPUT_TOKENS", "100000"))  # Maximum input tokens per request
+    per_request_budget_cents: float = float(os.getenv("PER_REQUEST_BUDGET_CENTS", "5.0"))  # Maximum cost per individual request
+    session_budget_cents: float = float(os.getenv("SESSION_BUDGET_CENTS", "50.0"))  # Maximum total cost per session
+    alert_on_high_cost: bool = os.getenv("ALERT_ON_HIGH_COST", "true").lower() == "true"  # Alert when request exceeds high cost threshold
+    high_cost_threshold_cents: float = float(os.getenv("HIGH_COST_THRESHOLD_CENTS", "1.0"))  # Cost threshold for alerts
 
     # Safety and preview settings
     preview_ttl_seconds: int = int(os.getenv("PREVIEW_TTL_SECONDS", "300"))  # 5 minutes
@@ -91,15 +93,13 @@ class Settings(BaseModel):
     auto_audit_on_connect: bool = os.getenv("AUTO_AUDIT_ON_CONNECT", "true").lower() == "true"
     max_preview_diffs_displayed: int = int(os.getenv("MAX_PREVIEW_DIFFS_DISPLAYED", "100"))
 
-    # Diagnostic thresholds
-    max_system_prompt_chars: int = int(os.getenv("MAX_SYSTEM_PROMPT_CHARS", "500"))
-    max_history_messages: int = int(os.getenv("MAX_HISTORY_MESSAGES", "10"))
-    max_sheet_content_chars: int = int(os.getenv("MAX_SHEET_CONTENT_CHARS", "5000"))
-    max_tools_schema_bytes: int = int(os.getenv("MAX_TOOLS_SCHEMA_BYTES", "0"))
-
-    # Cost spike detection
-    enable_cost_spike_detection: bool = os.getenv("ENABLE_COST_SPIKE_DETECTION", "true").lower() == "true"
-    cost_spike_threshold_multiplier: float = float(os.getenv("COST_SPIKE_THRESHOLD_MULTIPLIER", "2.0"))
+    # Diagnostics - monitoring and alerting thresholds
+    enable_cost_spike_detection: bool = os.getenv("ENABLE_COST_SPIKE_DETECTION", "true").lower() == "true"  # Detect unusual cost spikes
+    max_system_prompt_chars: int = int(os.getenv("MAX_SYSTEM_PROMPT_CHARS", "5000"))  # Maximum system prompt size
+    max_history_messages: int = int(os.getenv("MAX_HISTORY_MESSAGES", "10"))  # Maximum conversation history messages
+    max_sheet_content_chars: int = int(os.getenv("MAX_SHEET_CONTENT_CHARS", "5000"))  # Maximum spreadsheet content size
+    max_tools_schema_bytes: int = int(os.getenv("MAX_TOOLS_SCHEMA_BYTES", "50000"))  # Maximum tool schema size in bytes
+    cost_spike_threshold_multiplier: float = float(os.getenv("COST_SPIKE_THRESHOLD_MULTIPLIER", "3.0"))  # Multiplier for cost spike detection
 
     # OpenRouter usage tracking
     openrouter_include_usage: bool = os.getenv("OPENROUTER_INCLUDE_USAGE", "true").lower() == "true"
