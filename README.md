@@ -65,6 +65,18 @@ The agent has access to the following tools:
 
 ---
 
+### Header-Based Mapping System
+SheetSmith includes a robust mapping system that uses stable header text instead of column letters:
+- Automatic column mapping by header name
+- Concept cell mapping (row × column intersection)
+- Duplicate header disambiguation with user confirmation
+- Mapping validation and health checks
+- API endpoints for mapping management
+
+See `src/sheetsmith/mapping/README.md` for complete documentation.
+
+---
+
 ## Architecture
 
 ```
@@ -80,6 +92,10 @@ SheetSmith/
 │   │   ├── analyzer.py      # Formula parsing and pattern detection
 │   │   ├── differ.py        # Diff generation
 │   │   └── patcher.py       # Patch management
+│   ├── mapping/        # Header-based column/cell mapping
+│   │   ├── manager.py       # Mapping orchestration
+│   │   ├── storage.py       # Database persistence
+│   │   └── validator.py     # Mapping validation
 │   ├── memory/         # Persistence layer
 │   │   ├── models.py        # Data models
 │   │   └── store.py         # SQLite storage
@@ -205,6 +221,14 @@ POST /api/sheets/read     # Read a range
 POST /api/sheets/search   # Search formulas
 ```
 
+### Mapping API
+```
+GET  /api/mappings/{spreadsheet_id}/audit  # Audit all mappings
+POST /api/mappings/disambiguate            # Store disambiguation choice
+DELETE /api/mappings/{mapping_id}          # Delete a mapping
+POST /api/mappings/validate                # Validate a mapping
+```
+
 ### Memory API
 ```
 GET  /api/rules           # List rules
@@ -212,6 +236,15 @@ POST /api/rules           # Create rule
 GET  /api/logic-blocks    # List logic blocks
 POST /api/logic-blocks    # Create logic block
 GET  /api/audit-logs      # View audit history
+```
+
+### Operations API
+```
+POST /api/ops/search      # Search cells deterministically
+POST /api/ops/preview     # Preview changes before apply
+POST /api/ops/apply       # Apply previewed changes
+POST /api/ops/preflight   # Preflight check for operations
+POST /api/ops/audit/mappings  # Audit mappings for operations
 ```
 
 ---
