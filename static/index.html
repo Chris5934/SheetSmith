@@ -8,25 +8,41 @@
 </head>
 <body>
     <div class="app-container">
+        <!-- Main Header -->
+        <header class="main-header">
+            <div class="header-left">
+                <h1 class="logo">SheetSmith</h1>
+                <span class="tagline">Sheets Automation Assistant</span>
+            </div>
+            <div class="header-center">
+                <div class="mode-toggle">
+                    <button id="mode-tools" class="mode-btn active" data-mode="tools">
+                        <span class="mode-icon">🛠️</span>
+                        <span class="mode-label">Tools / Deterministic</span>
+                        <span class="mode-cost">$0.00</span>
+                    </button>
+                    <button id="mode-ai" class="mode-btn" data-mode="ai">
+                        <span class="mode-icon">🤖</span>
+                        <span class="mode-label">AI Assist</span>
+                        <span class="mode-cost">Estimated</span>
+                    </button>
+                </div>
+            </div>
+            <div class="header-right">
+                <div id="connection-status" class="connection-status disconnected">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Not Connected</span>
+                </div>
+            </div>
+        </header>
+
         <!-- Sidebar -->
         <aside class="sidebar">
-            <div class="sidebar-header">
-                <h1 class="logo">SheetSmith</h1>
-                <p class="tagline">Sheets Automation Assistant</p>
-            </div>
-
             <div class="sidebar-section">
                 <h3>Spreadsheet</h3>
                 <input type="text" id="spreadsheet-id" placeholder="Enter Spreadsheet ID" class="input-field">
                 <button id="connect-btn" class="btn btn-primary">Connect</button>
                 <div id="spreadsheet-info" class="info-box hidden"></div>
-            </div>
-
-            <div class="sidebar-section">
-                <h3>Quick Actions</h3>
-                <button class="btn btn-secondary quick-action" data-action="search">Search Formulas</button>
-                <button class="btn btn-secondary quick-action" data-action="audit">Audit Patterns</button>
-                <button class="btn btn-secondary quick-action" data-action="rules">View Rules</button>
             </div>
 
             <div class="sidebar-section">
@@ -39,64 +55,278 @@
 
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Chat Container -->
-            <div class="chat-container">
-                <div id="chat-messages" class="chat-messages">
-                    <div class="message assistant">
-                        <div class="message-content">
-                            <p>Hello! I'm SheetSmith, your Google Sheets automation assistant.</p>
-                            <p>I can help you:</p>
-                            <ul>
-                                <li>Find and update formula patterns across sheets</li>
-                                <li>Replace shared logic (kits, teammates, rotations)</li>
-                                <li>Audit formulas for consistency</li>
-                                <li>Apply batch updates safely</li>
-                            </ul>
-                            <p>Connect a spreadsheet using the sidebar, then tell me what you'd like to do!</p>
-                        </div>
-                    </div>
+            <!-- Tools/Deterministic Mode -->
+            <div id="tools-panel" class="mode-panel active">
+                <div class="panel-header">
+                    <h2>Deterministic Tools</h2>
+                    <p class="panel-description">Form-based operations • Zero LLM cost • Always requires preview</p>
                 </div>
 
-                <div class="chat-input-container">
-                    <textarea
-                        id="chat-input"
-                        class="chat-input"
-                        placeholder="Ask me to update formulas, search for patterns, or modify your spreadsheet..."
-                        rows="2"
-                    ></textarea>
-                    <div class="chat-actions">
-                        <button id="send-btn" class="btn btn-primary">Send</button>
-                        <button id="reset-btn" class="btn btn-secondary">Reset Chat</button>
+                <div class="tools-form">
+                    <div class="form-group">
+                        <label for="operation-type">Operation Type</label>
+                        <select id="operation-type" class="input-field">
+                            <option value="">-- Select operation --</option>
+                            <option value="replace_in_formulas">Replace in Formulas</option>
+                            <option value="set_value_by_header">Set Value by Header + Row</option>
+                            <option value="copy_block">Copy Block</option>
+                            <option value="audit">Audit / List Only</option>
+                        </select>
+                    </div>
+
+                    <!-- Replace in Formulas Form -->
+                    <div id="form-replace" class="operation-form hidden">
+                        <div class="form-group">
+                            <label for="header-name">Target Column Header</label>
+                            <div class="input-with-button">
+                                <input type="text" id="header-name" class="input-field" placeholder="e.g., Base Damage">
+                                <button id="search-headers-btn" class="btn btn-secondary btn-icon" title="Search headers">🔍</button>
+                            </div>
+                            <div id="header-suggestions" class="suggestions-dropdown hidden"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="all-sheets" checked>
+                                All sheets
+                            </label>
+                            <div id="sheet-selector" class="sheet-selector hidden">
+                                <label>Selected sheets:</label>
+                                <div id="sheet-checkboxes" class="checkbox-list"></div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="find-text">Find (text or pattern)</label>
+                            <textarea id="find-text" class="input-field textarea" rows="3" placeholder="SWITCH(activeAnom, &quot;Burn&quot;, 0.5, ...)"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="replace-text">Replace with</label>
+                            <textarea id="replace-text" class="input-field textarea" rows="3" placeholder="SWITCH(activeAnom, &quot;Burn&quot;, 0.7, ...)"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="match-type">Match Type</label>
+                            <select id="match-type" class="input-field">
+                                <option value="exact">Exact Match</option>
+                                <option value="contains">Contains</option>
+                                <option value="regex">Regular Expression</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Set Value by Header Form -->
+                    <div id="form-set-value" class="operation-form hidden">
+                        <div class="form-group">
+                            <label for="set-header-name">Column Header</label>
+                            <input type="text" id="set-header-name" class="input-field" placeholder="e.g., Attack">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="row-identifier">Row Identifier</label>
+                            <input type="text" id="row-identifier" class="input-field" placeholder="e.g., Character 1">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="new-value">New Value</label>
+                            <input type="text" id="new-value" class="input-field" placeholder="1000">
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="set-all-sheets" checked>
+                                All sheets
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Copy Block Form -->
+                    <div id="form-copy-block" class="operation-form hidden">
+                        <div class="form-group">
+                            <label for="source-sheet">Source Sheet</label>
+                            <select id="source-sheet" class="input-field">
+                                <option value="">-- Select sheet --</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="source-range">Source Range</label>
+                            <input type="text" id="source-range" class="input-field" placeholder="A1:D10">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Target Sheets</label>
+                            <div id="target-sheets" class="checkbox-list"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="target-position">Target Position</label>
+                            <input type="text" id="target-position" class="input-field" placeholder="A1 or header name">
+                        </div>
+                    </div>
+
+                    <!-- Audit Form -->
+                    <div id="form-audit" class="operation-form hidden">
+                        <div class="form-group">
+                            <label for="audit-header">Column Header</label>
+                            <input type="text" id="audit-header" class="input-field" placeholder="e.g., Base Damage">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="audit-pattern">Formula Pattern (optional)</label>
+                            <textarea id="audit-pattern" class="input-field textarea" rows="3" placeholder="Leave empty to list all formulas in column"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="export-format">Export Format</label>
+                            <select id="export-format" class="input-field">
+                                <option value="table">Table</option>
+                                <option value="csv">CSV</option>
+                                <option value="json">JSON</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Scope Summary Widget -->
+                    <div id="scope-summary" class="scope-summary hidden">
+                        <h4>Scope Summary</h4>
+                        <div class="scope-content">
+                            <div class="scope-item">
+                                <span class="scope-label">Sheets:</span>
+                                <span id="scope-sheets" class="scope-value">-</span>
+                            </div>
+                            <div class="scope-item">
+                                <span class="scope-label">Estimated cells:</span>
+                                <span id="scope-cells" class="scope-value">-</span>
+                            </div>
+                            <div class="scope-item">
+                                <span class="scope-label">Headers matched:</span>
+                                <span id="scope-headers" class="scope-value">-</span>
+                            </div>
+                            <div id="scope-status" class="scope-status">
+                                ✅ Within safety limits
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cost Indicator -->
+                    <div class="cost-indicator">
+                        <span class="cost-icon">✅</span>
+                        <span class="cost-text">Cost: $0.00 (Deterministic operation)</span>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="form-actions">
+                        <button id="preview-btn" class="btn btn-primary" disabled>Preview Changes</button>
+                        <button id="clear-form-btn" class="btn btn-secondary">Clear Form</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Assist Mode -->
+            <div id="ai-panel" class="mode-panel hidden">
+                <div class="panel-header">
+                    <h2>AI Assist</h2>
+                    <p class="panel-description">Natural language requests • LLM-powered • Converts to deterministic operations</p>
+                </div>
+
+                <div class="ai-assist-content">
+                    <div class="ai-cost-estimator">
+                        <span class="cost-icon">⚠️</span>
+                        <span class="cost-text">Estimated cost: $0.01 - $0.05 per request</span>
+                    </div>
+
+                    <div class="ai-input-section">
+                        <label for="ai-input">What would you like to do?</label>
+                        <textarea 
+                            id="ai-input" 
+                            class="input-field textarea" 
+                            rows="4" 
+                            placeholder="Example: Update the Corruption ratio from 28.6% to 30.0% in all formulas in the Base Damage column"
+                        ></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button id="analyze-request-btn" class="btn btn-primary">Analyze Request</button>
+                        <button id="clear-ai-btn" class="btn btn-secondary">Clear</button>
+                    </div>
+
+                    <div id="ai-suggestion" class="ai-suggestion hidden">
+                        <h4>AI Suggested Operation</h4>
+                        <div id="ai-suggestion-content" class="suggestion-content"></div>
+                        <div class="form-actions">
+                            <button id="use-suggestion-btn" class="btn btn-success">Use This Operation</button>
+                            <button id="refine-btn" class="btn btn-secondary">Refine Request</button>
+                        </div>
+                    </div>
+
+                    <!-- Chat History for AI mode -->
+                    <div id="ai-chat" class="ai-chat hidden">
+                        <h4>Conversation</h4>
+                        <div id="ai-messages" class="chat-messages"></div>
                     </div>
                 </div>
             </div>
         </main>
-
-        <!-- Right Panel (Diff Preview) -->
-        <aside class="right-panel hidden" id="diff-panel">
-            <div class="panel-header">
-                <h3>Change Preview</h3>
-                <button class="btn-close" id="close-diff">&times;</button>
-            </div>
-            <div class="diff-content" id="diff-content">
-                <!-- Diff will be rendered here -->
-            </div>
-            <div class="panel-actions">
-                <button id="approve-btn" class="btn btn-success">Approve Changes</button>
-                <button id="reject-btn" class="btn btn-danger">Reject</button>
-            </div>
-        </aside>
     </div>
 
-    <!-- Modal for Search Results -->
-    <div id="search-modal" class="modal hidden">
-        <div class="modal-content">
+    <!-- Preview Modal -->
+    <div id="preview-modal" class="modal hidden">
+        <div class="modal-content modal-large">
             <div class="modal-header">
-                <h3>Search Results</h3>
+                <h3>Change Preview</h3>
                 <button class="btn-close modal-close">&times;</button>
             </div>
-            <div class="modal-body" id="search-results">
-                <!-- Results will be rendered here -->
+            <div class="modal-body">
+                <div class="preview-scope">
+                    <div class="scope-info-grid">
+                        <div class="scope-info-item">
+                            <span class="label">Scope:</span>
+                            <span id="preview-scope-summary">-</span>
+                        </div>
+                        <div class="scope-info-item">
+                            <span class="label">Columns:</span>
+                            <span id="preview-columns">-</span>
+                        </div>
+                        <div class="scope-info-item">
+                            <span class="label">Sheets:</span>
+                            <span id="preview-sheets">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="preview-changes">
+                    <div id="preview-content" class="preview-content"></div>
+                </div>
+
+                <div class="preview-pagination">
+                    <button id="prev-change-btn" class="btn btn-secondary btn-small">← Previous</button>
+                    <span id="change-counter" class="change-counter">Change 1 of 10</span>
+                    <button id="next-change-btn" class="btn btn-secondary btn-small">Next →</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="export-preview-btn" class="btn btn-secondary">Export Preview</button>
+                <button id="apply-changes-btn" class="btn btn-success">Apply All Changes</button>
+                <button class="btn btn-danger modal-close">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Confirm Changes</h3>
+                <button class="btn-close modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message"></p>
+            </div>
+            <div class="modal-footer">
+                <button id="confirm-yes-btn" class="btn btn-success">Continue</button>
+                <button id="confirm-no-btn" class="btn btn-secondary modal-close">Cancel</button>
             </div>
         </div>
     </div>
