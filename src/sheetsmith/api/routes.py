@@ -342,6 +342,26 @@ async def health_check():
     return diagnostics
 
 
+@router.get("/config/limits")
+async def get_config_limits():
+    """Get safety limits and cost configuration."""
+    from ..config import settings
+    
+    return {
+        "safety_limits": {
+            "max_cells_per_operation": settings.max_cells_per_operation,
+            "max_sheets_per_operation": settings.max_sheets_per_operation,
+            "max_formula_length": settings.max_formula_length,
+            "require_preview_above_cells": settings.require_preview_above_cells,
+        },
+        "cost_info": {
+            "deterministic_cost": 0.0,
+            "ai_estimated_cost_min": 0.01,
+            "ai_estimated_cost_max": 0.05,
+        },
+    }
+
+
 # Cost tracking endpoints
 
 

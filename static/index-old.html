@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SheetSmith - Google Sheets Automation Assistant</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="logo">SheetSmith</h1>
+                <p class="tagline">Sheets Automation Assistant</p>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Spreadsheet</h3>
+                <input type="text" id="spreadsheet-id" placeholder="Enter Spreadsheet ID" class="input-field">
+                <button id="connect-btn" class="btn btn-primary">Connect</button>
+                <div id="spreadsheet-info" class="info-box hidden"></div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Quick Actions</h3>
+                <button class="btn btn-secondary quick-action" data-action="search">Search Formulas</button>
+                <button class="btn btn-secondary quick-action" data-action="audit">Audit Patterns</button>
+                <button class="btn btn-secondary quick-action" data-action="rules">View Rules</button>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>Recent Activity</h3>
+                <div id="activity-log" class="activity-log">
+                    <p class="placeholder-text">No recent activity</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Chat Container -->
+            <div class="chat-container">
+                <div id="chat-messages" class="chat-messages">
+                    <div class="message assistant">
+                        <div class="message-content">
+                            <p>Hello! I'm SheetSmith, your Google Sheets automation assistant.</p>
+                            <p>I can help you:</p>
+                            <ul>
+                                <li>Find and update formula patterns across sheets</li>
+                                <li>Replace shared logic (kits, teammates, rotations)</li>
+                                <li>Audit formulas for consistency</li>
+                                <li>Apply batch updates safely</li>
+                            </ul>
+                            <p>Connect a spreadsheet using the sidebar, then tell me what you'd like to do!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input-container">
+                    <textarea
+                        id="chat-input"
+                        class="chat-input"
+                        placeholder="Ask me to update formulas, search for patterns, or modify your spreadsheet..."
+                        rows="2"
+                    ></textarea>
+                    <div class="chat-actions">
+                        <button id="send-btn" class="btn btn-primary">Send</button>
+                        <button id="reset-btn" class="btn btn-secondary">Reset Chat</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Panel (Diff Preview) -->
+        <aside class="right-panel hidden" id="diff-panel">
+            <div class="panel-header">
+                <h3>Change Preview</h3>
+                <button class="btn-close" id="close-diff">&times;</button>
+            </div>
+            <div class="diff-content" id="diff-content">
+                <!-- Diff will be rendered here -->
+            </div>
+            <div class="panel-actions">
+                <button id="approve-btn" class="btn btn-success">Approve Changes</button>
+                <button id="reject-btn" class="btn btn-danger">Reject</button>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Modal for Search Results -->
+    <div id="search-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Search Results</h3>
+                <button class="btn-close modal-close">&times;</button>
+            </div>
+            <div class="modal-body" id="search-results">
+                <!-- Results will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+    <script src="/static/costs.js"></script>
+</body>
+</html>
