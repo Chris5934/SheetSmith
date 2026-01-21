@@ -27,8 +27,7 @@ class MappingStorage:
         self._connection = await aiosqlite.connect(str(self.db_path))
 
         # Create column_mappings table
-        await self._connection.executescript(
-            """
+        await self._connection.executescript("""
             CREATE TABLE IF NOT EXISTS column_mappings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 spreadsheet_id TEXT NOT NULL,
@@ -49,8 +48,7 @@ class MappingStorage:
                 ON column_mappings(spreadsheet_id, sheet_name);
             CREATE INDEX IF NOT EXISTS idx_column_mappings_header 
                 ON column_mappings(spreadsheet_id, sheet_name, header_text);
-            """
-        )
+            """)
         await self._connection.commit()
         logger.info("MappingStorage initialized")
 
@@ -68,9 +66,7 @@ class MappingStorage:
             mapping.created_at = datetime.utcnow()
 
         disambiguation_json = (
-            json.dumps(mapping.disambiguation_context)
-            if mapping.disambiguation_context
-            else None
+            json.dumps(mapping.disambiguation_context) if mapping.disambiguation_context else None
         )
 
         await self._connection.execute(
@@ -91,11 +87,7 @@ class MappingStorage:
                 mapping.header_row,
                 None,  # cell_address is NULL for column mappings
                 disambiguation_json,
-                (
-                    mapping.last_validated_at.isoformat()
-                    if mapping.last_validated_at
-                    else None
-                ),
+                (mapping.last_validated_at.isoformat() if mapping.last_validated_at else None),
                 mapping.created_at.isoformat(),
             ),
         )
@@ -188,9 +180,7 @@ class MappingStorage:
             mapping.created_at = datetime.utcnow()
 
         disambiguation_json = (
-            json.dumps(mapping.disambiguation_context)
-            if mapping.disambiguation_context
-            else None
+            json.dumps(mapping.disambiguation_context) if mapping.disambiguation_context else None
         )
 
         await self._connection.execute(
@@ -211,11 +201,7 @@ class MappingStorage:
                 mapping.row_index,  # Store row_index in header_row column
                 mapping.cell_address,
                 disambiguation_json,
-                (
-                    mapping.last_validated_at.isoformat()
-                    if mapping.last_validated_at
-                    else None
-                ),
+                (mapping.last_validated_at.isoformat() if mapping.last_validated_at else None),
                 mapping.created_at.isoformat(),
             ),
         )

@@ -1,7 +1,6 @@
 """Mapping validation logic for header-based mappings."""
 
 import logging
-from datetime import datetime
 from typing import Optional
 
 from ..sheets import GoogleSheetsClient
@@ -22,17 +21,15 @@ class MappingValidator:
     def __init__(self, sheets_client: GoogleSheetsClient):
         self.sheets_client = sheets_client
 
-    async def validate_column_mapping(
-        self, mapping: ColumnMapping
-    ) -> ValidationResult:
+    async def validate_column_mapping(self, mapping: ColumnMapping) -> ValidationResult:
         """
         Validate that a column mapping is still accurate.
-        
+
         Checks:
         1. Header still exists
         2. Header is in expected position
         3. No duplicate headers exist
-        
+
         Returns ValidationResult with status and any required actions.
         """
         try:
@@ -95,12 +92,12 @@ class MappingValidator:
     async def validate_cell_mapping(self, mapping: CellMapping) -> ValidationResult:
         """
         Validate that a cell mapping is still accurate.
-        
+
         Checks:
         1. Column header still exists
         2. Row label still exists
         3. Intersection cell is still valid
-        
+
         Returns ValidationResult with status and any required actions.
         """
         try:
@@ -180,7 +177,7 @@ class MappingValidator:
     ) -> list[ColumnCandidate]:
         """
         Find all occurrences of a header in a sheet.
-        
+
         Returns list of ColumnCandidate objects for each match.
         """
         # Read the header row (or multiple rows to search)
@@ -198,9 +195,7 @@ class MappingValidator:
                 if cell.value and str(cell.value).strip() == header_text:
                     # Found a matching header
                     # Extract column letter from cell address (e.g., "A1" -> "A")
-                    col_letter = "".join(
-                        c for c in cell.cell if c.isalpha()
-                    )
+                    col_letter = "".join(c for c in cell.cell if c.isalpha())
                     row_num = int("".join(c for c in cell.cell if c.isdigit()))
 
                     # Get column index (A=0, B=1, etc.)
@@ -237,7 +232,7 @@ class MappingValidator:
     ) -> Optional[int]:
         """
         Find a row by its label in the first column.
-        
+
         Returns 0-based row index, or None if not found.
         """
         # Read the first column to find the row label

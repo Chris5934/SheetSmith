@@ -8,7 +8,6 @@ from ..sheets import GoogleSheetsClient
 from .models import (
     ColumnMapping,
     CellMapping,
-    DisambiguationRequest,
     DisambiguationResponse,
     DisambiguationRequiredError,
     MappingNotFoundError,
@@ -16,7 +15,6 @@ from .models import (
     MappingStatus,
     MappingAuditEntry,
     MappingAuditReport,
-    ColumnCandidate,
 )
 from .storage import MappingStorage
 from .validator import MappingValidator
@@ -28,7 +26,7 @@ logger = logging.getLogger(__name__)
 class MappingManager:
     """
     Manages header-based column and cell mappings.
-    
+
     This is the main entry point for all mapping operations. It coordinates
     between storage, validation, and disambiguation.
     """
@@ -40,7 +38,7 @@ class MappingManager:
     ):
         """
         Initialize the mapping manager.
-        
+
         Args:
             sheets_client: Google Sheets client for reading spreadsheet data
             storage: Optional MappingStorage instance (created if not provided)
@@ -72,7 +70,7 @@ class MappingManager:
     ) -> ColumnMapping:
         """
         Get a column mapping by header text.
-        
+
         This will:
         1. Check if a cached mapping exists
         2. If exists, validate it's still accurate
@@ -80,25 +78,23 @@ class MappingManager:
         4. If multiple headers found, raise DisambiguationRequiredError
         5. If single header found, create/update mapping
         6. If no header found, raise HeaderNotFoundError
-        
+
         Args:
             spreadsheet_id: The spreadsheet ID
             sheet_name: The sheet name
             header_text: The header text to search for
             auto_create: Automatically create mapping if not cached (default True)
-            
+
         Returns:
             ColumnMapping for the header
-            
+
         Raises:
             DisambiguationRequiredError: If multiple columns have the same header
             HeaderNotFoundError: If header not found in sheet
             MappingNotFoundError: If mapping not found and auto_create is False
         """
         # Check if we have a cached mapping
-        cached = await self.storage.get_column_mapping(
-            spreadsheet_id, sheet_name, header_text
-        )
+        cached = await self.storage.get_column_mapping(spreadsheet_id, sheet_name, header_text)
 
         if cached:
             # Validate the cached mapping
@@ -152,9 +148,7 @@ class MappingManager:
         )
 
         if len(candidates) == 0:
-            raise HeaderNotFoundError(
-                f"Header '{header_text}' not found in sheet '{sheet_name}'"
-            )
+            raise HeaderNotFoundError(f"Header '{header_text}' not found in sheet '{sheet_name}'")
 
         if len(candidates) > 1:
             # Multiple headers found, need disambiguation
@@ -192,23 +186,23 @@ class MappingManager:
     ) -> CellMapping:
         """
         Get a concept cell mapping by column header × row label intersection.
-        
+
         This will:
         1. Check if a cached mapping exists
         2. If exists, validate it's still accurate
         3. If not exists or invalid, search for header and row label
         4. Create/update mapping with cell address
-        
+
         Args:
             spreadsheet_id: The spreadsheet ID
             sheet_name: The sheet name
             column_header: The column header text
             row_label: The row label text (usually in first column)
             auto_create: Automatically create mapping if not cached (default True)
-            
+
         Returns:
             CellMapping for the intersection
-            
+
         Raises:
             DisambiguationRequiredError: If multiple columns have the same header
             HeaderNotFoundError: If header or row label not found
@@ -263,9 +257,7 @@ class MappingManager:
 
         # No cached mapping, search for header and row
         if not auto_create:
-            raise MappingNotFoundError(
-                f"No mapping found for cell '{column_header} × {row_label}'"
-            )
+            raise MappingNotFoundError(f"No mapping found for cell '{column_header} × {row_label}'")
 
         # Search for the column header
         header_candidates = await self.validator._find_header_in_sheet(
@@ -289,9 +281,7 @@ class MappingManager:
         )
 
         if row_index is None:
-            raise HeaderNotFoundError(
-                f"Row label '{row_label}' not found in sheet '{sheet_name}'"
-            )
+            raise HeaderNotFoundError(f"Row label '{row_label}' not found in sheet '{sheet_name}'")
 
         # Create the cell mapping
         header_candidate = header_candidates[0]
@@ -317,16 +307,14 @@ class MappingManager:
 
         return mapping
 
-    async def validate_mapping(
-        self, mapping_id: int, mapping_type: str = "column"
-    ) -> dict:
+    async def validate_mapping(self, mapping_id: int, mapping_type: str = "column") -> dict:
         """
         Validate a specific mapping by ID.
-        
+
         Args:
             mapping_id: The mapping ID
             mapping_type: "column" or "cell"
-            
+
         Returns:
             Dict with validation results
         """
@@ -341,18 +329,16 @@ class MappingManager:
         # For now, return a placeholder
         return {"status": "not_implemented"}
 
-    async def store_disambiguation(
-        self, response: DisambiguationResponse
-    ) -> ColumnMapping:
+    async def store_disambiguation(self, response: DisambiguationResponse) -> ColumnMapping:
         """
         Store user's disambiguation choice and create mapping.
-        
+
         Args:
             response: User's disambiguation response
-            
+
         Returns:
             ColumnMapping created from the disambiguation
-            
+
         Raises:
             ValueError: If request not found or invalid
         """
@@ -365,9 +351,7 @@ class MappingManager:
         selected = self.disambiguator.resolve_disambiguation(response)
 
         # Create the mapping
-        mapping = self.disambiguator.create_mapping_from_resolution(
-            request, response, selected
-        )
+        mapping = self.disambiguator.create_mapping_from_resolution(request, response, selected)
 
         # Store the mapping
         await self.storage.store_column_mapping(mapping)
@@ -382,13 +366,13 @@ class MappingManager:
     async def audit_mappings(self, spreadsheet_id: str) -> MappingAuditReport:
         """
         Audit all mappings for a spreadsheet.
-        
+
         This checks the health of all cached mappings and returns a report
         showing which are valid, moved, missing, or ambiguous.
-        
+
         Args:
             spreadsheet_id: The spreadsheet ID to audit
-            
+
         Returns:
             MappingAuditReport with status of all mappings
         """
@@ -489,11 +473,11 @@ class MappingManager:
     async def delete_mapping(self, mapping_id: int, mapping_type: str = "column") -> bool:
         """
         Delete a mapping by ID.
-        
+
         Args:
             mapping_id: The mapping ID
             mapping_type: "column" or "cell"
-            
+
         Returns:
             True if deleted, False if not found
         """

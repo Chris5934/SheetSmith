@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 class MappingStatus(str, Enum):
     """Status of a mapping."""
-    
+
     VALID = "valid"  # ✅ Header exists and is in expected position
     MOVED = "moved"  # ⚠️ Header exists but in different position
     MISSING = "missing"  # ❌ Header not found
@@ -17,7 +17,7 @@ class MappingStatus(str, Enum):
 
 class ColumnMapping(BaseModel):
     """Mapping of a column by its header text."""
-    
+
     id: Optional[int] = None
     spreadsheet_id: str
     sheet_name: str
@@ -33,7 +33,7 @@ class ColumnMapping(BaseModel):
 
 class CellMapping(BaseModel):
     """Mapping of a concept cell by column header × row label intersection."""
-    
+
     id: Optional[int] = None
     spreadsheet_id: str
     sheet_name: str
@@ -50,17 +50,17 @@ class CellMapping(BaseModel):
 
 class ColumnCandidate(BaseModel):
     """A candidate column when multiple columns have the same header."""
-    
+
     column_letter: str
     column_index: int
     header_row: int
     sample_values: list[str] = Field(default_factory=list)  # Sample values from column
     adjacent_headers: dict[str, Optional[str]] = Field(default_factory=dict)  # left/right headers
-    
-    
+
+
 class DisambiguationRequest(BaseModel):
     """Request for user to disambiguate between multiple matching columns."""
-    
+
     request_id: str
     spreadsheet_id: str
     sheet_name: str
@@ -71,7 +71,7 @@ class DisambiguationRequest(BaseModel):
 
 class DisambiguationResponse(BaseModel):
     """User's response to a disambiguation request."""
-    
+
     request_id: str
     selected_column_index: int
     user_label: Optional[str] = None  # Optional user-provided label for this column
@@ -79,7 +79,7 @@ class DisambiguationResponse(BaseModel):
 
 class ValidationResult(BaseModel):
     """Result of validating a mapping."""
-    
+
     is_valid: bool
     status: MappingStatus
     message: str
@@ -91,7 +91,7 @@ class ValidationResult(BaseModel):
 
 class MappingAuditEntry(BaseModel):
     """Single entry in a mapping audit report."""
-    
+
     mapping_id: int
     mapping_type: str  # "column" or "cell"
     spreadsheet_id: str
@@ -107,7 +107,7 @@ class MappingAuditEntry(BaseModel):
 
 class MappingAuditReport(BaseModel):
     """Report of all mappings for a spreadsheet."""
-    
+
     spreadsheet_id: str
     spreadsheet_title: Optional[str] = None
     total_mappings: int
@@ -121,7 +121,7 @@ class MappingAuditReport(BaseModel):
 
 class DisambiguationRequiredError(Exception):
     """Exception raised when disambiguation is required."""
-    
+
     def __init__(self, request: DisambiguationRequest):
         self.request = request
         super().__init__(
@@ -132,11 +132,11 @@ class DisambiguationRequiredError(Exception):
 
 class MappingNotFoundError(Exception):
     """Exception raised when a requested mapping is not found."""
-    
+
     pass
 
 
 class HeaderNotFoundError(Exception):
     """Exception raised when a header is not found in the spreadsheet."""
-    
+
     pass

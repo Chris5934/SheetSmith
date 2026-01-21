@@ -33,13 +33,13 @@ class DisambiguationHandler:
     ) -> DisambiguationRequest:
         """
         Create a new disambiguation request.
-        
+
         Args:
             spreadsheet_id: The spreadsheet ID
             sheet_name: The sheet name
             header_text: The ambiguous header text
             candidates: List of column candidates
-            
+
         Returns:
             DisambiguationRequest with a unique request_id
         """
@@ -60,12 +60,10 @@ class DisambiguationHandler:
 
         return request
 
-    def get_disambiguation_request(
-        self, request_id: str
-    ) -> Optional[DisambiguationRequest]:
+    def get_disambiguation_request(self, request_id: str) -> Optional[DisambiguationRequest]:
         """
         Get a pending disambiguation request by ID.
-        
+
         Returns None if request not found or expired.
         """
         request = self._pending_requests.get(request_id)
@@ -87,13 +85,13 @@ class DisambiguationHandler:
     ) -> ColumnCandidate:
         """
         Resolve a disambiguation request with user's choice.
-        
+
         Args:
             response: User's disambiguation response
-            
+
         Returns:
             The selected ColumnCandidate
-            
+
         Raises:
             ValueError: If request not found or selected index is invalid
         """
@@ -130,12 +128,12 @@ class DisambiguationHandler:
     ) -> ColumnMapping:
         """
         Create a ColumnMapping from a resolved disambiguation.
-        
+
         Args:
             request: The original disambiguation request
             response: User's response
             selected: The selected column candidate
-            
+
         Returns:
             ColumnMapping with disambiguation context
         """
@@ -162,7 +160,7 @@ class DisambiguationHandler:
     def cleanup_expired_requests(self) -> int:
         """
         Clean up expired disambiguation requests.
-        
+
         Returns:
             Number of expired requests removed
         """
