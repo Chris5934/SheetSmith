@@ -29,7 +29,7 @@ def mock_ops_engine():
     
     # Mock preview method
     async def mock_preview(spreadsheet_id, operation):
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         return PreviewResponse(
             preview_id="preview-123",
             spreadsheet_id=spreadsheet_id,
@@ -52,7 +52,7 @@ def mock_ops_engine():
                 requires_approval=True,
             ),
             diff_text="- old\n+ new",
-            expires_at=datetime.utcnow() + timedelta(hours=1),
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
     
     engine.preview = AsyncMock(side_effect=mock_preview)

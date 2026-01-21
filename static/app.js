@@ -433,7 +433,7 @@ class SheetSmithApp {
             const findText = this.findText?.value.trim();
             const replaceText = this.replaceText?.value.trim();
             
-            if (!header || !findText) {
+            if (!header || !findText || !replaceText) {
                 throw new Error('Please fill in header, find text, and replace text');
             }
             
@@ -464,9 +464,9 @@ class SheetSmithApp {
         } else if (operationType === 'set_value_by_header') {
             const header = document.getElementById('set-header-name')?.value.trim();
             const rowLabel = document.getElementById('row-identifier')?.value.trim();
-            const newValue = document.getElementById('new-value')?.value.trim();
+            const newValue = document.getElementById('new-value')?.value;
             
-            if (!header || !rowLabel || newValue === undefined) {
+            if (!header || !rowLabel || newValue === null || newValue === undefined || newValue === '') {
                 throw new Error('Please fill in header, row identifier, and new value');
             }
             
