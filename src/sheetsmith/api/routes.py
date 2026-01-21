@@ -1248,3 +1248,169 @@ async def get_cost_summary(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Mode-based Operations (Deterministic vs AI-Assist)
+# ============================================================================
+
+@router.post("/modes/deterministic/replace")
+async def deterministic_replace(request: "DeterministicReplaceRequest"):
+    """
+    Replace formulas deterministically by header and pattern.
+    
+    This endpoint performs replacements without LLM usage:
+    - Requires explicit header text (never column letters)
+    - Direct string replacement in formulas
+    - Returns preview before applying
+    
+    Args:
+        request: Replace operation parameters
+        
+    Returns:
+        PreviewResponse with proposed changes
+    """
+    from ..modes import DeterministicReplaceRequest, OperationRequest, OperationMode
+    from ..modes.router import ModeRouter
+    
+    try:
+        # Get ops engine
+        ops_engine = get_ops_engine()
+        
+        # Create mode router
+        router_instance = ModeRouter(ops_engine=ops_engine)
+        
+        # Convert to generic operation request
+        operation_request = OperationRequest(
+            mode=OperationMode.DETERMINISTIC,
+            operation_type="replace_in_formulas",
+            spreadsheet_id=request.spreadsheet_id,
+            parameters={
+                "header_text": request.header_text,
+                "find": request.find,
+                "replace": request.replace,
+                "sheet_names": request.sheet_names,
+                "case_sensitive": request.case_sensitive,
+                "is_regex": request.is_regex,
+            }
+        )
+        
+        # Route operation
+        preview = await router_instance.route_operation(operation_request)
+        
+        return preview
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/modes/deterministic/set_value")
+async def deterministic_set_value(request: "SetValueRequest"):
+    """
+    Set values by header + row label intersection.
+    
+    This endpoint sets values deterministically:
+    - No LLM - direct cell lookup and update
+    - Requires: spreadsheet_id, sheet_name, header, row_label, value
+    - Returns preview before applying
+    
+    Args:
+        request: Set value operation parameters
+        
+    Returns:
+        PreviewResponse with proposed change
+    """
+    from ..modes import SetValueRequest, OperationRequest, OperationMode
+    from ..modes.router import ModeRouter
+    
+    try:
+        # Get ops engine
+        ops_engine = get_ops_engine()
+        
+        # Create mode router
+        router_instance = ModeRouter(ops_engine=ops_engine)
+        
+        # Convert to generic operation request
+        operation_request = OperationRequest(
+            mode=OperationMode.DETERMINISTIC,
+            operation_type="set_value_by_header",
+            spreadsheet_id=request.spreadsheet_id,
+            parameters={
+                "sheet_name": request.sheet_name,
+                "header": request.header,
+                "row_label": request.row_label,
+                "value": request.value,
+            }
+        )
+        
+        # Route operation
+        preview = await router_instance.route_operation(operation_request)
+        
+        return preview
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/modes/ai_assist/interpret")
+async def ai_assist_interpret(request: "AIAssistRequest"):
+    """
+    Use AI to interpret vague request and generate deterministic command.
+    
+    This endpoint uses LLM once to:
+    - Parse natural language description
+    - Identify target cells/ranges
+    - Generate JSON command for deterministic execution
+    - User must approve before applying
+    
+    Args:
+        request: Natural language operation request
+        
+    Returns:
+        Generated deterministic command (not yet executed)
+    """
+    from ..modes import AIAssistRequest
+    
+    try:
+        # Get AI agent
+        agent = get_agent()
+        
+        # This would integrate with the existing AI agent
+        # For now, return not implemented
+        raise HTTPException(
+            status_code=501,
+            detail="AI-assist mode not yet fully implemented"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/modes/switch")
+async def switch_mode(request: "ModeSwitchRequest"):
+    """
+    Switch between modes for current operation.
+    
+    Allows upgrading from deterministic to AI assist if needed,
+    or downgrading from AI assist to deterministic with resolved parameters.
+    
+    Args:
+        request: Mode switch request with operation data
+        
+    Returns:
+        Updated operation request in target mode
+    """
+    from ..modes import ModeSwitchRequest
+    
+    try:
+        # Mode switching logic
+        # This would preserve operation state while changing mode
+        return {
+            "from_mode": request.from_mode,
+            "to_mode": request.to_mode,
+            "operation_data": request.operation_data,
+            "message": f"Switched from {request.from_mode} to {request.to_mode}",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
