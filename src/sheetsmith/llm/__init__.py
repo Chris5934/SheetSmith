@@ -11,6 +11,12 @@ from .cost_tracking import (
     calculate_tools_size,
     estimate_tokens_from_chars,
 )
+from .budget import OperationBudgetGuard, OperationType
+from .minimal_prompts import (
+    PARSER_SYSTEM_PROMPT,
+    AI_ASSIST_SYSTEM_PROMPT,
+    PLANNING_SYSTEM_PROMPT,
+)
 
 __all__ = [
     "LLMClient",
@@ -24,4 +30,9 @@ __all__ = [
     "calculate_message_chars",
     "calculate_tools_size",
     "estimate_tokens_from_chars",
+    "OperationBudgetGuard",
+    "OperationType",
+    "PARSER_SYSTEM_PROMPT",
+    "AI_ASSIST_SYSTEM_PROMPT",
+    "PLANNING_SYSTEM_PROMPT",
 ]
