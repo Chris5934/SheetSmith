@@ -91,5 +91,18 @@ class Settings(BaseModel):
     auto_audit_on_connect: bool = os.getenv("AUTO_AUDIT_ON_CONNECT", "true").lower() == "true"
     max_preview_diffs_displayed: int = int(os.getenv("MAX_PREVIEW_DIFFS_DISPLAYED", "100"))
 
+    # Diagnostic thresholds
+    max_system_prompt_chars: int = int(os.getenv("MAX_SYSTEM_PROMPT_CHARS", "500"))
+    max_history_messages: int = int(os.getenv("MAX_HISTORY_MESSAGES", "10"))
+    max_sheet_content_chars: int = int(os.getenv("MAX_SHEET_CONTENT_CHARS", "5000"))
+    max_tools_schema_bytes: int = int(os.getenv("MAX_TOOLS_SCHEMA_BYTES", "0"))
+
+    # Cost spike detection
+    enable_cost_spike_detection: bool = os.getenv("ENABLE_COST_SPIKE_DETECTION", "true").lower() == "true"
+    cost_spike_threshold_multiplier: float = float(os.getenv("COST_SPIKE_THRESHOLD_MULTIPLIER", "2.0"))
+
+    # OpenRouter usage tracking
+    openrouter_include_usage: bool = os.getenv("OPENROUTER_INCLUDE_USAGE", "true").lower() == "true"
+
 
 settings = Settings()
