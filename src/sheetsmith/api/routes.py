@@ -4,7 +4,30 @@ from typing import Optional
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException
 
+from ..ops import (
+    DeterministicOpsEngine,
+    SearchRequest,
+    PreviewRequest,
+    ApplyRequest,
+)
+
 router = APIRouter()
+
+# Global ops engine instance
+_ops_engine: Optional[DeterministicOpsEngine] = None
+
+
+def get_ops_engine() -> DeterministicOpsEngine:
+    """Get the global ops engine instance."""
+    global _ops_engine
+    if _ops_engine is None:
+        from .app import get_agent
+        agent = get_agent()
+        _ops_engine = DeterministicOpsEngine(
+            sheets_client=agent.sheets_client,
+            memory_store=agent.memory_store,
+        )
+    return _ops_engine
 
 
 def get_agent():
@@ -34,7 +57,7 @@ class SpreadsheetInfoRequest(BaseModel):
     spreadsheet_id: str
 
 
-class SearchRequest(BaseModel):
+class FormulaSearchRequest(BaseModel):
     """Request for formula search."""
 
     spreadsheet_id: str
@@ -146,7 +169,7 @@ async def read_range(request: RangeReadRequest):
 
 
 @router.post("/sheets/search")
-async def search_formulas(request: SearchRequest):
+async def search_formulas(request: FormulaSearchRequest):
     """Search for formulas matching a pattern."""
     agent = get_agent()
     try:
@@ -363,3 +386,137 @@ async def reset_costs():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Deterministic Operations endpoints
+
+
+@router.post("/ops/search")
+async def ops_search(request: SearchRequest):
+    """
+    Search for cells matching criteria.
+    
+    This deterministic operation searches by:
+    - Header name (never by column letter)
+    - Row label/identifier
+    - Formula pattern (exact or regex)
+    - Value pattern
+    
+    No LLM usage - pure deterministic search.
+    """
+    ops_engine = get_ops_engine()
+    try:
+        result = ops_engine.search(
+            spreadsheet_id=request.spreadsheet_id,
+            criteria=request.criteria,
+            limit=request.limit,
+        )
+        return {
+            "matches": [
+                {
+                    "spreadsheet_id": m.spreadsheet_id,
+                    "sheet_name": m.sheet_name,
+                    "cell": m.cell,
+                    "row": m.row,
+                    "col": m.col,
+                    "header": m.header,
+                    "row_label": m.row_label,
+                    "value": m.value,
+                    "formula": m.formula,
+                }
+                for m in result.matches
+            ],
+            "total_count": result.total_count,
+            "searched_sheets": result.searched_sheets,
+            "execution_time_ms": result.execution_time_ms,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/ops/preview")
+async def ops_preview(request: PreviewRequest):
+    """
+    Generate preview of proposed changes.
+    
+    Shows:
+    - Before/after values for each affected cell
+    - Clear scope summary (sheets, cells, headers affected)
+    - Location info for every change
+    
+    Returns a preview_id for use with /ops/apply.
+    """
+    ops_engine = get_ops_engine()
+    try:
+        preview = ops_engine.generate_preview(
+            spreadsheet_id=request.spreadsheet_id,
+            operation=request.operation,
+        )
+        return {
+            "preview_id": preview.preview_id,
+            "spreadsheet_id": preview.spreadsheet_id,
+            "operation_type": preview.operation_type.value,
+            "description": preview.description,
+            "changes": [
+                {
+                    "sheet_name": c.sheet_name,
+                    "cell": c.cell,
+                    "old_value": c.old_value,
+                    "old_formula": c.old_formula,
+                    "new_value": c.new_value,
+                    "new_formula": c.new_formula,
+                    "header": c.header,
+                    "row_label": c.row_label,
+                }
+                for c in preview.changes
+            ],
+            "scope": {
+                "total_cells": preview.scope.total_cells,
+                "affected_sheets": preview.scope.affected_sheets,
+                "affected_headers": preview.scope.affected_headers,
+                "sheet_count": preview.scope.sheet_count,
+                "requires_approval": preview.scope.requires_approval,
+            },
+            "diff_text": preview.diff_text,
+            "created_at": preview.created_at.isoformat(),
+            "expires_at": preview.expires_at.isoformat(),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/ops/apply")
+async def ops_apply(request: ApplyRequest):
+    """
+    Apply previously previewed changes.
+    
+    Requires:
+    - preview_id from /ops/preview
+    - confirmation=true for operations affecting many cells
+    
+    Validates:
+    - Preview hasn't expired
+    - Safety limits are respected
+    
+    Returns:
+    - Success status
+    - Number of cells updated
+    - Audit log ID
+    """
+    ops_engine = get_ops_engine()
+    try:
+        result = await ops_engine.apply_changes(
+            preview_id=request.preview_id,
+            confirmation=request.confirmation,
+        )
+        return {
+            "success": result.success,
+            "preview_id": result.preview_id,
+            "spreadsheet_id": result.spreadsheet_id,
+            "cells_updated": result.cells_updated,
+            "errors": result.errors,
+            "audit_log_id": result.audit_log_id,
+            "applied_at": result.applied_at.isoformat(),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
