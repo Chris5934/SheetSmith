@@ -12,11 +12,11 @@ from . import (
 )
 from ..ops import (
     DeterministicOpsEngine,
-    SearchCriteria,
     PreviewRequest,
     PreviewResponse,
     OperationType,
 )
+from ..ops.models import SearchCriteria, Operation
 
 if TYPE_CHECKING:
     from ..agent import SheetSmithAgent
@@ -85,7 +85,7 @@ class ModeRouter:
             preview_request.operation
         )
         
-        logger.info(f"Deterministic preview generated: {len(preview.diffs)} changes")
+        logger.info(f"Deterministic preview generated: {len(preview.changes)} changes")
         return preview
 
     async def _handle_ai_assist(self, request: OperationRequest) -> PreviewResponse:
@@ -141,8 +141,6 @@ class ModeRouter:
         Returns:
             PreviewRequest for ops engine
         """
-        from ..ops.models import Operation, OperationType as OpType
-        
         params = request.parameters
         
         # Build search criteria based on operation type
@@ -156,7 +154,7 @@ class ModeRouter:
             )
             
             operation = Operation(
-                operation_type=OpType.REPLACE_IN_FORMULAS,
+                operation_type=OperationType.REPLACE_IN_FORMULAS,
                 description=f"Replace '{params.get('find')}' with '{params.get('replace')}' in formulas under '{params.get('header_text')}'",
                 search_criteria=criteria,
                 find_pattern=params.get("find"),
@@ -171,7 +169,7 @@ class ModeRouter:
             )
             
             operation = Operation(
-                operation_type=OpType.SET_VALUE_BY_HEADER,
+                operation_type=OperationType.SET_VALUE_BY_HEADER,
                 description=f"Set value at '{params.get('header')}' and row '{params.get('row_label')}' to '{params.get('value')}'",
                 search_criteria=criteria,
                 header_name=params.get("header"),
