@@ -94,6 +94,7 @@ class PreviewRequest(BaseModel):
 
     spreadsheet_id: str
     operation: Operation
+    dry_run: bool = False
 
 
 class ScopeInfo(BaseModel):
@@ -125,6 +126,7 @@ class ApplyRequest(BaseModel):
 
     preview_id: str
     confirmation: bool = False
+    dry_run: bool = False
 
 
 class ApplyResponse(BaseModel):

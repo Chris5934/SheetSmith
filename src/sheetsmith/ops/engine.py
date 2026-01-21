@@ -89,7 +89,7 @@ class DeterministicOpsEngine:
         return result
 
     def generate_preview(
-        self, spreadsheet_id: str, operation: Operation, ttl_minutes: int = 30
+        self, spreadsheet_id: str, operation: Operation, ttl_minutes: int = 30, dry_run: bool = False
     ) -> PreviewResponse:
         """
         Generate a preview of proposed changes.
@@ -103,18 +103,23 @@ class DeterministicOpsEngine:
             spreadsheet_id: The spreadsheet to operate on
             operation: The operation to preview
             ttl_minutes: Time to live for the preview (default 30 minutes)
+            dry_run: If True, only validate and preview without storing for apply
             
         Returns:
             PreviewResponse with changes and metadata
         """
-        logger.info(f"Generating preview for {operation.operation_type} on {spreadsheet_id}")
-        
-        preview = self.preview_generator.generate_preview(
-            spreadsheet_id, operation, ttl_minutes
+        logger.info(
+            f"Generating preview for {operation.operation_type} on {spreadsheet_id} "
+            f"(dry_run={dry_run})"
         )
         
-        # Store in cache
-        self.preview_cache.store(preview, ttl_minutes)
+        preview = self.preview_generator.generate_preview(
+            spreadsheet_id, operation, ttl_minutes, dry_run
+        )
+        
+        # Store in cache only if not dry-run
+        if not dry_run:
+            self.preview_cache.store(preview, ttl_minutes)
         
         logger.info(
             f"Preview generated: {preview.preview_id} - "
@@ -124,7 +129,9 @@ class DeterministicOpsEngine:
         
         return preview
 
-    async def apply_changes(self, preview_id: str, confirmation: bool = False) -> ApplyResponse:
+    async def apply_changes(
+        self, preview_id: str, confirmation: bool = False, dry_run: bool = False
+    ) -> ApplyResponse:
         """
         Apply previously previewed changes.
         
@@ -138,11 +145,14 @@ class DeterministicOpsEngine:
         Args:
             preview_id: The preview ID to apply
             confirmation: User confirmation (required for large operations)
+            dry_run: If True, perform all validation but skip actual write
             
         Returns:
             ApplyResponse with results
         """
-        logger.info(f"Applying changes from preview {preview_id}")
+        logger.info(
+            f"Applying changes from preview {preview_id} (dry_run={dry_run})"
+        )
         
         # Retrieve preview from cache
         preview = self.preview_cache.get(preview_id)
@@ -157,12 +167,14 @@ class DeterministicOpsEngine:
             )
         
         # Apply changes
-        result = await self.apply_engine.apply_changes(preview, confirmation)
+        result = await self.apply_engine.apply_changes(preview, confirmation, dry_run)
         
-        # Remove from cache if successful
-        if result.success:
+        # Remove from cache if successful and not dry-run
+        if result.success and not dry_run:
             self.preview_cache.remove(preview_id)
             logger.info(f"Successfully applied {result.cells_updated} changes")
+        elif result.success and dry_run:
+            logger.info(f"Dry-run successful: would apply {result.cells_updated} changes")
         else:
             logger.warning(f"Failed to apply changes: {result.errors}")
         

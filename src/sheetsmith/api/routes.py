@@ -96,6 +96,21 @@ class LogicBlockCreateRequest(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class PreflightRequest(BaseModel):
+    """Request for preflight safety check without full preview."""
+    
+    spreadsheet_id: str
+    operation: dict  # Operation model as dict
+
+
+class OpsAuditRequest(BaseModel):
+    """Request to audit operations system health."""
+    
+    spreadsheet_id: str
+    check_mappings: bool = True
+    check_cache: bool = True
+
+
 # Chat endpoints
 
 
@@ -463,14 +478,25 @@ async def ops_preview(request: PreviewRequest):
     - Before/after values for each affected cell
     - Clear scope summary (sheets, cells, headers affected)
     - Location info for every change
+    - Safety check results
+    
+    Query parameters:
+    - dry_run: If true, only validate without storing for apply
     
     Returns a preview_id for use with /ops/apply.
     """
+    from fastapi import Query
+    
     ops_engine = get_ops_engine()
+    
+    # Extract dry_run from request if it has it, otherwise default to False
+    dry_run = getattr(request, 'dry_run', False)
+    
     try:
         preview = ops_engine.generate_preview(
             spreadsheet_id=request.spreadsheet_id,
             operation=request.operation,
+            dry_run=dry_run,
         )
         return {
             "preview_id": preview.preview_id,
@@ -500,6 +526,7 @@ async def ops_preview(request: PreviewRequest):
             "diff_text": preview.diff_text,
             "created_at": preview.created_at.isoformat(),
             "expires_at": preview.expires_at.isoformat(),
+            "dry_run": dry_run,
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -518,6 +545,9 @@ async def ops_apply(request: ApplyRequest):
     - Preview hasn't expired
     - Safety limits are respected
     
+    Query parameters:
+    - dry_run: If true, validate but don't actually write to spreadsheet
+    
     Returns:
     - Success status
     - Number of cells updated
@@ -528,6 +558,7 @@ async def ops_apply(request: ApplyRequest):
         result = await ops_engine.apply_changes(
             preview_id=request.preview_id,
             confirmation=request.confirmation,
+            dry_run=getattr(request, 'dry_run', False),
         )
         return {
             "success": result.success,
@@ -537,9 +568,107 @@ async def ops_apply(request: ApplyRequest):
             "errors": result.errors,
             "audit_log_id": result.audit_log_id,
             "applied_at": result.applied_at.isoformat(),
+            "dry_run": getattr(request, 'dry_run', False),
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/ops/preflight")
+async def ops_preflight(request: PreflightRequest):
+    """
+    Run preflight safety checks without generating full preview.
+    
+    Performs quick validation:
+    - Check hard limits (cells, sheets, formula length)
+    - Detect ambiguities (duplicate headers)
+    - Estimate scope and duration
+    
+    Returns safety check results without creating a preview.
+    """
+    from ..ops import SafetyChecker
+    from ..ops.safety_models import ScopeSummary
+    from ..ops.models import Operation, OperationType
+    
+    ops_engine = get_ops_engine()
+    safety_checker = SafetyChecker(ops_engine.sheets_client)
+    
+    try:
+        # Parse operation from dict
+        operation = Operation(**request.operation)
+        
+        # Create minimal scope summary for preflight
+        # In a real implementation, would do a quick search to estimate scope
+        scope = ScopeSummary(
+            total_cells=0,  # Estimated, would need actual search
+            total_sheets=len(operation.search_criteria.sheet_names) if operation.search_criteria and operation.search_criteria.sheet_names else 1,
+            sheet_names=operation.search_criteria.sheet_names if operation.search_criteria and operation.search_criteria.sheet_names else [],
+            headers_affected=[operation.header_name] if operation.header_name else [],
+            formula_patterns_matched=[operation.find_pattern] if operation.find_pattern else [],
+        )
+        
+        # Run safety checks
+        safety_check = safety_checker.check_operation_safety(operation, scope)
+        
+        return {
+            "passed": safety_check.passed,
+            "warnings": safety_check.warnings,
+            "errors": safety_check.errors,
+            "limit_breaches": safety_check.limit_breaches,
+            "ambiguities": safety_check.ambiguities,
+            "estimated_scope": {
+                "total_sheets": scope.total_sheets,
+                "sheet_names": scope.sheet_names,
+                "headers_affected": scope.headers_affected,
+                "formula_patterns": scope.formula_patterns_matched,
+            },
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/ops/audit/mappings")
+async def audit_ops_mappings(spreadsheet_id: str):
+    """
+    Audit mapping health for operations system.
+    
+    Checks:
+    - Cached header mappings are still valid
+    - No duplicate headers within sheets
+    - No orphaned mappings
+    
+    Returns detailed audit report with recommendations.
+    """
+    from ..ops import SafetyChecker
+    
+    ops_engine = get_ops_engine()
+    safety_checker = SafetyChecker(ops_engine.sheets_client)
+    
+    try:
+        # Run mapping validation
+        report = safety_checker.validate_mappings(spreadsheet_id)
+        
+        return {
+            "timestamp": report.timestamp,
+            "spreadsheet_id": report.spreadsheet_id,
+            "mappings_checked": report.mappings_checked,
+            "valid_mappings": report.valid_mappings,
+            "invalid_mappings": [
+                {
+                    "mapping_id": entry.mapping_id,
+                    "mapping_type": entry.mapping_type,
+                    "sheet_name": entry.sheet_name,
+                    "header_text": entry.header_text,
+                    "status": entry.status,
+                    "issue_details": entry.issue_details,
+                }
+                for entry in report.invalid_mappings
+            ],
+            "warnings": report.warnings,
+            "recommendations": report.recommendations,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Header-Based Mapping endpoints

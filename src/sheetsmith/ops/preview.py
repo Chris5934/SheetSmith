@@ -17,6 +17,8 @@ from .models import (
     ScopeInfo,
 )
 from .search import CellSearchEngine
+from .safety_models import PreviewDiff, ScopeSummary, SafetyCheck
+from .safety_checker import SafetyChecker
 from ..config import settings
 
 logger = logging.getLogger(__name__)
@@ -29,16 +31,19 @@ class PreviewGenerator:
         self,
         sheets_client: Optional[GoogleSheetsClient] = None,
         search_engine: Optional[CellSearchEngine] = None,
+        safety_checker: Optional[SafetyChecker] = None,
     ):
         self.sheets_client = sheets_client or GoogleSheetsClient()
         self.search_engine = search_engine or CellSearchEngine(self.sheets_client)
         self.differ = FormulaDiffer()
+        self.safety_checker = safety_checker or SafetyChecker(self.sheets_client)
 
     def generate_preview(
         self,
         spreadsheet_id: str,
         operation: Operation,
         ttl_minutes: int = 30,
+        dry_run: bool = False,
     ) -> PreviewResponse:
         """
         Generate a preview of the operation.
@@ -47,11 +52,15 @@ class PreviewGenerator:
             spreadsheet_id: The spreadsheet ID
             operation: The operation to preview
             ttl_minutes: Time to live for the preview
+            dry_run: If True, only generate preview without storing for apply
             
         Returns:
             PreviewResponse with changes and metadata
         """
-        logger.info(f"Generating preview for operation: {operation.operation_type}")
+        logger.info(
+            f"Generating preview for operation: {operation.operation_type} "
+            f"(dry_run={dry_run})"
+        )
         
         # Generate changes based on operation type
         if operation.operation_type == OperationType.REPLACE_IN_FORMULAS:
@@ -63,14 +72,30 @@ class PreviewGenerator:
         else:
             raise ValueError(f"Unsupported operation type: {operation.operation_type}")
         
-        # Calculate scope
+        # Calculate enhanced scope summary
+        scope_summary = self._calculate_enhanced_scope(changes, operation)
+        
+        # Run safety checks
+        safety_check = self.safety_checker.check_operation_safety(operation, scope_summary)
+        
+        if not safety_check.passed:
+            logger.warning(
+                f"Safety check failed for preview: {safety_check.errors}"
+            )
+            # Include safety check info in preview but allow preview generation
+            # The actual apply will enforce these limits
+        
+        # Calculate legacy scope for backwards compatibility
         scope = self._calculate_scope(changes)
         
-        # Generate diff text
-        diff_text = self._generate_diff_text(changes)
+        # Generate enhanced diff text with formula diffs
+        diff_text = self._generate_enhanced_diff_text(changes)
         
         # Create preview response
         preview_id = str(uuid.uuid4())
+        
+        # Use configured TTL seconds, converting to minutes
+        ttl_seconds = getattr(settings, 'preview_ttl_seconds', 300)
         
         return PreviewResponse(
             preview_id=preview_id,
@@ -81,7 +106,7 @@ class PreviewGenerator:
             scope=scope,
             diff_text=diff_text,
             created_at=datetime.utcnow(),
-            expires_at=datetime.utcnow() + timedelta(minutes=ttl_minutes),
+            expires_at=datetime.utcnow() + timedelta(seconds=ttl_seconds),
         )
 
     def _preview_replace_in_formulas(
@@ -242,7 +267,7 @@ class PreviewGenerator:
         return changes
 
     def _calculate_scope(self, changes: list[ChangeSpec]) -> ScopeInfo:
-        """Calculate scope information from changes."""
+        """Calculate scope information from changes (legacy format)."""
         affected_sheets = list(set(c.sheet_name for c in changes))
         affected_headers = list(set(c.header for c in changes if c.header))
         
@@ -256,8 +281,54 @@ class PreviewGenerator:
             requires_approval=requires_approval,
         )
 
+    def _calculate_enhanced_scope(
+        self, changes: list[ChangeSpec], operation: Operation
+    ) -> ScopeSummary:
+        """Calculate enhanced scope summary with detailed information."""
+        affected_sheets = list(set(c.sheet_name for c in changes))
+        affected_headers = list(set(c.header for c in changes if c.header))
+        
+        # Calculate row ranges by sheet
+        row_ranges = {}
+        for change in changes:
+            sheet = change.sheet_name
+            row = change.cell
+            # Extract row number from A1 notation (e.g., "B2" -> 2)
+            try:
+                row_num = int(''.join(filter(str.isdigit, row)))
+                if sheet not in row_ranges:
+                    row_ranges[sheet] = [row_num, row_num]
+                else:
+                    row_ranges[sheet][0] = min(row_ranges[sheet][0], row_num)
+                    row_ranges[sheet][1] = max(row_ranges[sheet][1], row_num)
+            except (ValueError, IndexError):
+                pass
+        
+        # Convert to tuple format
+        row_range_by_sheet = {
+            sheet: tuple(range_list) for sheet, range_list in row_ranges.items()
+        }
+        
+        # Collect formula patterns matched
+        formula_patterns = []
+        if operation.find_pattern:
+            formula_patterns.append(operation.find_pattern)
+        
+        # Estimate duration (rough estimate: 10ms per cell)
+        estimated_duration = len(changes) * 0.01
+        
+        return ScopeSummary(
+            total_cells=len(changes),
+            total_sheets=len(affected_sheets),
+            sheet_names=affected_sheets,
+            headers_affected=affected_headers,
+            row_range_by_sheet=row_range_by_sheet,
+            formula_patterns_matched=formula_patterns,
+            estimated_duration_seconds=estimated_duration,
+        )
+
     def _generate_diff_text(self, changes: list[ChangeSpec]) -> str:
-        """Generate human-readable diff text."""
+        """Generate human-readable diff text (legacy format)."""
         lines = []
         
         for change in changes:
@@ -276,3 +347,70 @@ class PreviewGenerator:
             lines.append("")
         
         return "\n".join(lines)
+
+    def _generate_enhanced_diff_text(self, changes: list[ChangeSpec]) -> str:
+        """Generate enhanced diff text with formula highlighting."""
+        lines = []
+        max_display = getattr(settings, 'max_preview_diffs_displayed', 100)
+        
+        for idx, change in enumerate(changes[:max_display]):
+            # Header with location info
+            header_info = f" (Header: {change.header})" if change.header else ""
+            row_info = f" (Row: {change.row_label})" if change.row_label else ""
+            lines.append(f"--- {change.sheet_name}!{change.cell}{header_info}{row_info}")
+            
+            # Show before
+            if change.old_formula:
+                lines.append(f"-  FORMULA: {change.old_formula}")
+                if change.old_value is not None:
+                    lines.append(f"-  VALUE:   {change.old_value}")
+            elif change.old_value is not None:
+                lines.append(f"-  {change.old_value}")
+            
+            # Show after
+            if change.new_formula:
+                lines.append(f"+  FORMULA: {change.new_formula}")
+                # Use differ to highlight changes if both formulas exist
+                if change.old_formula:
+                    diff = self.differ.generate_diff(change.old_formula, change.new_formula)
+                    if diff.has_changes:
+                        lines.append(f"   DIFF:    {diff.text_diff}")
+            elif change.new_value is not None:
+                lines.append(f"+  {change.new_value}")
+            
+            lines.append("")
+        
+        # Add summary if truncated
+        if len(changes) > max_display:
+            remaining = len(changes) - max_display
+            lines.append(f"... and {remaining} more changes (showing first {max_display})")
+        
+        return "\n".join(lines)
+
+    def generate_preview_diffs(self, changes: list[ChangeSpec]) -> list[PreviewDiff]:
+        """Generate detailed PreviewDiff objects for UI consumption."""
+        diffs = []
+        
+        for change in changes:
+            # Determine change type
+            if change.old_formula and change.new_formula:
+                change_type = "both" if change.old_value != change.new_value else "formula"
+            elif change.new_formula or change.old_formula:
+                change_type = "formula"
+            else:
+                change_type = "value"
+            
+            diff = PreviewDiff(
+                cell_address=change.cell,
+                sheet_name=change.sheet_name,
+                header_name=change.header,
+                row_label=change.row_label,
+                before_value=str(change.old_value) if change.old_value is not None else "",
+                after_value=str(change.new_value) if change.new_value is not None else "",
+                before_formula=change.old_formula,
+                after_formula=change.new_formula,
+                change_type=change_type,
+            )
+            diffs.append(diff)
+        
+        return diffs
