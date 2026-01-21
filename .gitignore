@@ -37,7 +37,8 @@ env/
 .env
 credentials.json
 token.json
-data/
+data/*
+!data/.gitkeep
 *.db
 
 # OS
@@ -51,4 +52,5 @@ htmlcov/
 
 # Logs
 *.log
-logs/
+logs/*
+!logs/.gitkeep
