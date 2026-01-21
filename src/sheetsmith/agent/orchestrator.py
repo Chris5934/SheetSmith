@@ -22,6 +22,9 @@ from ..llm import (
     calculate_message_chars,
     calculate_tools_size,
     estimate_tokens_from_chars,
+    LLMDiagnostics,
+    CostSpikeDetector,
+    DiagnosticAlertSystem,
 )
 from .prompts import SYSTEM_PROMPT
 
@@ -64,6 +67,23 @@ class SheetSmithAgent:
             alert_threshold_cents=settings.high_cost_threshold_cents,
         )
         self.operation_budget_guard = OperationBudgetGuard()
+        
+        # Initialize diagnostics system
+        self.diagnostics = LLMDiagnostics(
+            max_system_prompt_chars=settings.max_system_prompt_chars,
+            max_history_messages=settings.max_history_messages,
+            max_sheet_content_chars=settings.max_sheet_content_chars,
+            max_tools_schema_bytes=settings.max_tools_schema_bytes,
+            spike_detector=CostSpikeDetector(
+                threshold_multiplier=settings.cost_spike_threshold_multiplier
+            ),
+        )
+        self.alert_system = DiagnosticAlertSystem(
+            enabled=settings.enable_cost_spike_detection
+        )
+        
+        # Store diagnostic reports for API access
+        self.diagnostic_reports: list = []
 
         # Conversation history
         self.messages: list[dict] = []
@@ -353,7 +373,24 @@ class SheetSmithAgent:
         if message and settings.alert_on_high_cost:
             print(f"\n{message}\n")
         
+        # Pre-call diagnostic check
+        import time
+        payload = {
+            "model": model,
+            "system": system_prompt,
+            "messages": context_messages,
+            "tools": tools,
+            "max_tokens": max_tokens,
+        }
+        expected_model = self._get_model_for_operation(operation)
+        pre_report = self.diagnostics.pre_call_check(payload, operation, expected_model)
+        
+        # Block call if there are errors
+        if pre_report.errors:
+            return f"❌ Diagnostic check failed: {', '.join(pre_report.errors)}"
+        
         # Call LLM with or without tools
+        start_time = time.time()
         response = self.client.create_message(
             model=model,
             max_tokens=max_tokens,
@@ -361,12 +398,32 @@ class SheetSmithAgent:
             tools=tools,
             messages=context_messages,
         )
+        duration = (time.time() - start_time) * 1000  # Convert to ms
         
         # Post-call logging
         usage = response.usage or {}
         input_tokens = usage.get("input_tokens", 0)
         output_tokens = usage.get("output_tokens", 0)
         actual_cost = self.budget_guard.estimate_cost(model, input_tokens, output_tokens)
+        
+        # Post-call diagnostic analysis
+        response_dict = {
+            "usage": usage,
+            "content": response.content,
+            "stop_reason": response.stop_reason,
+        }
+        post_report = self.diagnostics.post_call_analysis(
+            pre_report, response_dict, duration, estimated_cost
+        )
+        
+        # Log the diagnostic report
+        self.diagnostics.log_report(post_report)
+        
+        # Store report for API access
+        self.diagnostic_reports.append(post_report)
+        
+        # Check for alerts
+        self.alert_system.send_alert(post_report)
         
         # Log the call
         self.call_logger.log_call(

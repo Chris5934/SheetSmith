@@ -45,6 +45,11 @@ class OpenRouterClient(LLMClient):
         # Add tools if provided
         if tools:
             payload["tools"] = self._convert_tools(tools)
+        
+        # Request usage data from OpenRouter for cost tracking
+        from ..config import settings
+        if settings.openrouter_include_usage:
+            payload["transforms"] = ["middle-out"]  # Enable detailed usage tracking
 
         with httpx.Client(timeout=60.0) as client:
             response = client.post(
@@ -257,6 +262,14 @@ class OpenRouterClient(LLMClient):
                 "input_tokens": data["usage"].get("prompt_tokens", 0),
                 "output_tokens": data["usage"].get("completion_tokens", 0),
             }
+            
+            # Include OpenRouter-specific cost data if available
+            if "native_tokens_prompt" in data["usage"]:
+                usage["native_tokens_prompt"] = data["usage"]["native_tokens_prompt"]
+            if "native_tokens_completion" in data["usage"]:
+                usage["native_tokens_completion"] = data["usage"]["native_tokens_completion"]
+            if "native_tokens_cost" in data["usage"]:
+                usage["native_tokens_cost"] = data["usage"]["native_tokens_cost"]
 
         return LLMResponse(
             content=content,

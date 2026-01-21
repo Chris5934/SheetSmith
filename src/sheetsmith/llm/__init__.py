@@ -17,6 +17,12 @@ from .minimal_prompts import (
     AI_ASSIST_SYSTEM_PROMPT,
     PLANNING_SYSTEM_PROMPT,
 )
+from .diagnostics import (
+    DiagnosticReport,
+    LLMDiagnostics,
+    CostSpikeDetector,
+    DiagnosticAlertSystem,
+)
 
 __all__ = [
     "LLMClient",
@@ -35,4 +41,8 @@ __all__ = [
     "PARSER_SYSTEM_PROMPT",
     "AI_ASSIST_SYSTEM_PROMPT",
     "PLANNING_SYSTEM_PROMPT",
+    "DiagnosticReport",
+    "LLMDiagnostics",
+    "CostSpikeDetector",
+    "DiagnosticAlertSystem",
 ]
