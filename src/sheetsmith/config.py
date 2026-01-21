@@ -59,5 +59,15 @@ class Settings(BaseModel):
     # Model selection for different operations
     planning_model: str = os.getenv("PLANNING_MODEL", "")  # Empty means use main model
 
+    # Cost tracking and limits
+    enable_cost_logging: bool = os.getenv("ENABLE_COST_LOGGING", "true").lower() == "true"
+    cost_log_path: Path = Path(os.getenv("COST_LOG_PATH", "logs/llm_costs.jsonl"))
+    payload_max_chars: int = int(os.getenv("PAYLOAD_MAX_CHARS", "50000"))
+    max_input_tokens: int = int(os.getenv("MAX_INPUT_TOKENS", "100000"))
+    per_request_budget_cents: float = float(os.getenv("PER_REQUEST_BUDGET_CENTS", "5.0"))
+    session_budget_cents: float = float(os.getenv("SESSION_BUDGET_CENTS", "50.0"))
+    alert_on_high_cost: bool = os.getenv("ALERT_ON_HIGH_COST", "true").lower() == "true"
+    high_cost_threshold_cents: float = float(os.getenv("HIGH_COST_THRESHOLD_CENTS", "1.0"))
+
 
 settings = Settings()

@@ -8,7 +8,16 @@ from ..sheets import GoogleSheetsClient
 from ..memory import MemoryStore
 from ..tools import ToolRegistry, GSheetsTools, MemoryTools, FormulaTools
 from ..engine import PatchEngine, FormulaDiffer
-from ..llm import AnthropicClient, OpenRouterClient, LLMClient
+from ..llm import (
+    AnthropicClient,
+    OpenRouterClient,
+    LLMClient,
+    LLMCallLogger,
+    BudgetGuard,
+    calculate_message_chars,
+    calculate_tools_size,
+    estimate_tokens_from_chars,
+)
 from .prompts import SYSTEM_PROMPT
 
 
@@ -36,6 +45,19 @@ class SheetSmithAgent:
 
         # Initialize LLM client based on provider
         self.client = self._create_llm_client()
+
+        # Initialize cost tracking
+        self.call_logger = LLMCallLogger(
+            log_path=settings.cost_log_path,
+            enabled=settings.enable_cost_logging,
+        )
+        self.budget_guard = BudgetGuard(
+            payload_max_chars=settings.payload_max_chars,
+            max_input_tokens=settings.max_input_tokens,
+            per_request_budget_cents=settings.per_request_budget_cents,
+            session_budget_cents=settings.session_budget_cents,
+            alert_threshold_cents=settings.high_cost_threshold_cents,
+        )
 
         # Conversation history
         self.messages: list[dict] = []
@@ -157,14 +179,75 @@ class SheetSmithAgent:
             else settings.model_name
         )
 
+        # Prepare LLM call parameters
+        tools = self.registry.to_anthropic_tools()
+        
+        # Pre-call cost checks
+        message_chars = calculate_message_chars(self.messages)
+        tools_size = calculate_tools_size(tools)
+        system_chars = len(SYSTEM_PROMPT)
+        total_chars = message_chars + system_chars
+        
+        # Check payload size
+        try:
+            self.budget_guard.check_payload_size(total_chars)
+        except ValueError as e:
+            # Return error to user instead of crashing
+            return f"❌ Request rejected: {str(e)}"
+        
+        # Estimate tokens
+        estimated_input_tokens = estimate_tokens_from_chars(total_chars + tools_size)
+        estimated_output_tokens = settings.max_tokens
+        
+        # Check token limits
+        try:
+            self.budget_guard.check_token_limit(estimated_input_tokens)
+        except ValueError as e:
+            return f"❌ Request rejected: {str(e)}"
+        
+        # Check budget
+        allowed, message = self.budget_guard.check_budget(
+            model, estimated_input_tokens, estimated_output_tokens
+        )
+        if not allowed:
+            return f"❌ Budget exceeded: {message}"
+        
+        # Show warning if high cost
+        if message and settings.alert_on_high_cost:
+            print(f"\n{message}\n")
+        
         # Call LLM with tools
         response = self.client.create_message(
             model=model,
             max_tokens=settings.max_tokens,
             system=SYSTEM_PROMPT,
-            tools=self.registry.to_anthropic_tools(),
+            tools=tools,
             messages=self.messages,
         )
+        
+        # Post-call logging
+        usage = response.usage or {}
+        input_tokens = usage.get("input_tokens", 0)
+        output_tokens = usage.get("output_tokens", 0)
+        actual_cost = self.budget_guard.estimate_cost(model, input_tokens, output_tokens)
+        
+        # Log the call
+        self.call_logger.log_call(
+            operation="process_message",
+            model=model,
+            provider=settings.llm_provider,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            message_chars=message_chars,
+            tools_included=len(tools) > 0,
+            tools_size_bytes=tools_size,
+            max_tokens=settings.max_tokens,
+            cost_cents=actual_cost,
+            usage_data=usage,
+        )
+        
+        # Update session cost
+        self.budget_guard.update_session_cost(actual_cost)
 
         # Process response, handling tool calls
         return await self._process_response(response)
@@ -228,14 +311,59 @@ class SheetSmithAgent:
                 else settings.model_name
             )
 
+            # Prepare for continuation call
+            tools = self.registry.to_anthropic_tools()
+            
+            # Pre-call cost checks for continuation
+            message_chars = calculate_message_chars(self.messages)
+            tools_size = calculate_tools_size(tools)
+            system_chars = len(SYSTEM_PROMPT)
+            total_chars = message_chars + system_chars
+            
+            # Estimate tokens for continuation
+            estimated_input_tokens = estimate_tokens_from_chars(total_chars + tools_size)
+            estimated_output_tokens = settings.max_tokens
+            
+            # Check budget for continuation
+            allowed, message = self.budget_guard.check_budget(
+                model, estimated_input_tokens, estimated_output_tokens
+            )
+            if not allowed:
+                # Return partial response with budget warning
+                return final_text + f"\n\n⚠️ Unable to continue: {message}"
+
             # Continue conversation
             continuation = self.client.create_message(
                 model=model,
                 max_tokens=settings.max_tokens,
                 system=SYSTEM_PROMPT,
-                tools=self.registry.to_anthropic_tools(),
+                tools=tools,
                 messages=self.messages,
             )
+            
+            # Post-call logging for continuation
+            usage = continuation.usage or {}
+            input_tokens = usage.get("input_tokens", 0)
+            output_tokens = usage.get("output_tokens", 0)
+            actual_cost = self.budget_guard.estimate_cost(model, input_tokens, output_tokens)
+            
+            # Log the continuation call
+            self.call_logger.log_call(
+                operation="tool_continuation",
+                model=model,
+                provider=settings.llm_provider,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                message_chars=message_chars,
+                tools_included=len(tools) > 0,
+                tools_size_bytes=tools_size,
+                max_tokens=settings.max_tokens,
+                cost_cents=actual_cost,
+                usage_data=usage,
+            )
+            
+            # Update session cost
+            self.budget_guard.update_session_cost(actual_cost)
 
             return await self._process_response(continuation)
 
@@ -252,3 +380,15 @@ class SheetSmithAgent:
     def reset_conversation(self):
         """Reset the conversation history."""
         self.messages = []
+    
+    def reset_cost_tracking(self):
+        """Reset cost tracking for the session."""
+        self.call_logger.reset_session()
+        self.budget_guard.reset_session()
+    
+    def get_cost_summary(self):
+        """Get cost summary for the current session."""
+        return {
+            **self.call_logger.get_session_summary(),
+            "budget_status": self.budget_guard.get_budget_status(),
+        }

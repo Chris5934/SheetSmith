@@ -317,3 +317,49 @@ async def health_check():
     }
 
     return diagnostics
+
+
+# Cost tracking endpoints
+
+
+@router.get("/costs/summary")
+async def get_costs_summary():
+    """Get cost summary for the current session."""
+    agent = get_agent()
+    try:
+        summary = agent.get_cost_summary()
+        return {
+            "status": "ok",
+            **summary,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/costs/details")
+async def get_costs_details(limit: int = 50):
+    """Get detailed cost log entries."""
+    agent = get_agent()
+    try:
+        recent_calls = agent.call_logger.get_recent_calls(limit=limit)
+        return {
+            "status": "ok",
+            "calls": recent_calls,
+            "count": len(recent_calls),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/costs/reset")
+async def reset_costs():
+    """Reset session cost tracking."""
+    agent = get_agent()
+    try:
+        agent.reset_cost_tracking()
+        return {
+            "status": "ok",
+            "message": "Cost tracking reset successfully",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
