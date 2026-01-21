@@ -246,7 +246,6 @@ POST /api/ops/apply       # Apply previewed changes
 POST /api/ops/preflight   # Preflight check for operations
 POST /api/ops/audit/mappings  # Audit mappings for operations
 ```
-```
 
 ---
 
