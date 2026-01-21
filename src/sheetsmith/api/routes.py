@@ -1140,3 +1140,113 @@ async def apply_placeholder_formula(request: PlaceholderApplyRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ========== Diagnostic Endpoints ==========
+
+
+class LLMCallHistoryRequest(BaseModel):
+    """Request for LLM call history."""
+    
+    limit: int = Field(default=100, ge=1, le=1000)
+    operation_type: Optional[str] = None
+    spike_only: bool = False
+
+
+@router.get("/diagnostics/llm-calls")
+async def get_llm_call_history(
+    limit: int = 100,
+    operation_type: Optional[str] = None,
+    spike_only: bool = False,
+):
+    """Get historical LLM call diagnostics.
+    
+    Args:
+        limit: Maximum number of records to return (1-1000)
+        operation_type: Filter by operation type (parser, helper, planning, etc.)
+        spike_only: If True, only return calls that triggered cost spike alerts
+        
+    Returns:
+        List of diagnostic reports
+    """
+    try:
+        agent = get_agent()
+        
+        # Check if agent has diagnostic data
+        if not hasattr(agent, 'diagnostic_reports'):
+            return {
+                "calls": [],
+                "total": 0,
+                "message": "No diagnostic data available. Diagnostics may not be enabled.",
+            }
+        
+        # Get diagnostic reports from agent
+        reports = agent.diagnostic_reports
+        
+        # Filter by operation type if specified
+        if operation_type:
+            reports = [r for r in reports if r.operation_type == operation_type]
+        
+        # Filter by spike if specified
+        if spike_only:
+            reports = [r for r in reports if r.is_spike]
+        
+        # Limit results
+        reports = reports[-limit:]
+        
+        # Convert to JSON-serializable format
+        calls = [r.to_json_log() for r in reports]
+        
+        return {
+            "calls": calls,
+            "total": len(calls),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/diagnostics/cost-summary")
+async def get_cost_summary(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+):
+    """Get cost summary and trends.
+    
+    Args:
+        start_date: Start date for summary (ISO format)
+        end_date: End date for summary (ISO format)
+        
+    Returns:
+        Cost summary with trends and statistics
+    """
+    try:
+        agent = get_agent()
+        
+        # Check if agent has cost logger
+        if not hasattr(agent, 'call_logger'):
+            return {
+                "total_calls": 0,
+                "total_cost_cents": 0.0,
+                "message": "No cost tracking data available.",
+            }
+        
+        # Get session summary from cost logger
+        summary = agent.call_logger.get_session_summary()
+        
+        # Get budget status
+        budget_status = agent.budget_guard.get_budget_status()
+        
+        # Combine into comprehensive summary
+        return {
+            "session_summary": summary,
+            "budget_status": budget_status,
+            "cost_per_operation": {
+                "parser": 0.1,
+                "helper": 0.3,
+                "ai_assist": 1.0,
+                "planning": 5.0,
+                "full_agent": 5.0,
+            },
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
