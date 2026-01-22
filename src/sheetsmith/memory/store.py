@@ -2,7 +2,7 @@
 
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -87,12 +87,23 @@ class MemoryStore:
             await self._connection.close()
             self._connection = None
 
+    def _ensure_connected(self) -> None:
+        """Ensure the database connection is established.
+        
+        Raises:
+            RuntimeError: If initialize() has not been called.
+        """
+        if self._connection is None:
+            raise RuntimeError(
+                "MemoryStore not initialized. Call initialize() first."
+            )
+
     # Rule operations
     async def store_rule(self, rule: Rule) -> Rule:
         """Store or update a rule."""
         if not rule.id:
             rule.id = str(uuid.uuid4())
-        rule.updated_at = datetime.utcnow()
+        rule.updated_at = datetime.now(timezone.utc)
 
         await self._connection.execute(
             """
@@ -159,8 +170,8 @@ class MemoryStore:
             rule_type=row[3],
             content=row[4],
             examples=json.loads(row[5]) if row[5] else [],
-            created_at=datetime.fromisoformat(row[6]) if row[6] else datetime.utcnow(),
-            updated_at=datetime.fromisoformat(row[7]) if row[7] else datetime.utcnow(),
+            created_at=datetime.fromisoformat(row[6]) if row[6] else datetime.now(timezone.utc),
+            updated_at=datetime.fromisoformat(row[7]) if row[7] else datetime.now(timezone.utc),
             tags=json.loads(row[8]) if row[8] else [],
         )
 
@@ -169,7 +180,7 @@ class MemoryStore:
         """Store or update a logic block."""
         if not block.id:
             block.id = str(uuid.uuid4())
-        block.updated_at = datetime.utcnow()
+        block.updated_at = datetime.now(timezone.utc)
 
         await self._connection.execute(
             """
@@ -224,13 +235,23 @@ class MemoryStore:
             return blocks
 
     async def search_logic_blocks(self, query: str) -> list[LogicBlock]:
-        """Search logic blocks by name or description."""
+        """Search logic blocks by name or description.
+        
+        Note: SQL LIKE wildcard characters (% and _) in the query are escaped
+        to ensure literal matching.
+        """
+        # Escape SQL LIKE wildcard characters for literal matching
+        escaped_query = query.replace('%', r'\%').replace('_', r'\_')
+        search_pattern = f"%{escaped_query}%"
+        
         async with self._connection.execute(
             """
             SELECT * FROM logic_blocks
-            WHERE name LIKE ? OR description LIKE ? OR formula_pattern LIKE ?
+            WHERE name LIKE ? ESCAPE '\\' 
+               OR description LIKE ? ESCAPE '\\'
+               OR formula_pattern LIKE ? ESCAPE '\\'
             """,
-            (f"%{query}%", f"%{query}%", f"%{query}%"),
+            (search_pattern, search_pattern, search_pattern),
         ) as cursor:
             rows = await cursor.fetchall()
             return [self._row_to_logic_block(row) for row in rows]
@@ -244,8 +265,8 @@ class MemoryStore:
             formula_pattern=row[4],
             variables=json.loads(row[5]) if row[5] else {},
             version=row[6] or "1.0",
-            created_at=datetime.fromisoformat(row[7]) if row[7] else datetime.utcnow(),
-            updated_at=datetime.fromisoformat(row[8]) if row[8] else datetime.utcnow(),
+            created_at=datetime.fromisoformat(row[7]) if row[7] else datetime.now(timezone.utc),
+            updated_at=datetime.fromisoformat(row[8]) if row[8] else datetime.now(timezone.utc),
             tags=json.loads(row[9]) if row[9] else [],
         )
 
@@ -365,7 +386,7 @@ class MemoryStore:
             title=row[1],
             description=row[2],
             spreadsheet_id=row[3],
-            timestamp=datetime.fromisoformat(row[4]) if row[4] else datetime.utcnow(),
+            timestamp=datetime.fromisoformat(row[4]) if row[4] else datetime.now(timezone.utc),
             pattern_searched=row[5],
             cells_modified=row[6] or 0,
             before_example=row[7],

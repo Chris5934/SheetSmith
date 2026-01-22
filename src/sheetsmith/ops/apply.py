@@ -3,7 +3,7 @@
 import uuid
 import logging
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..sheets import GoogleSheetsClient, BatchUpdate, CellUpdate
 from ..engine.safety import SafetyValidator
@@ -49,7 +49,7 @@ class ApplyEngine:
         )
         
         # Validate that preview hasn't expired
-        if datetime.utcnow() > preview.expires_at:
+        if datetime.now(timezone.utc) > preview.expires_at:
             return ApplyResponse(
                 success=False,
                 preview_id=preview.preview_id,
@@ -190,7 +190,7 @@ class ApplyEngine:
         try:
             audit_log = AuditLog(
                 id=str(uuid.uuid4()),
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 action=f"ops_{preview.operation_type.value}",
                 spreadsheet_id=preview.spreadsheet_id,
                 description=preview.description,
@@ -226,7 +226,7 @@ class ApplyEngine:
         try:
             audit_log = AuditLog(
                 id=str(uuid.uuid4()),
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 action=f"ops_{preview.operation_type.value}_dry_run",
                 spreadsheet_id=preview.spreadsheet_id,
                 description=f"[DRY RUN] {preview.description}",

@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -63,7 +63,7 @@ class MappingStorage:
     async def store_column_mapping(self, mapping: ColumnMapping) -> ColumnMapping:
         """Store or update a column mapping."""
         if not mapping.created_at:
-            mapping.created_at = datetime.utcnow()
+            mapping.created_at = datetime.now(timezone.utc)
 
         disambiguation_json = (
             json.dumps(mapping.disambiguation_context) if mapping.disambiguation_context else None
@@ -177,7 +177,7 @@ class MappingStorage:
     async def store_cell_mapping(self, mapping: CellMapping) -> CellMapping:
         """Store or update a cell mapping."""
         if not mapping.created_at:
-            mapping.created_at = datetime.utcnow()
+            mapping.created_at = datetime.now(timezone.utc)
 
         disambiguation_json = (
             json.dumps(mapping.disambiguation_context) if mapping.disambiguation_context else None

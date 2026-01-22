@@ -1,17 +1,22 @@
 """Preview cache management."""
 
+import asyncio
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from .models import PreviewResponse
 
 
 class PreviewCache:
-    """In-memory cache for operation previews."""
+    """In-memory cache for operation previews.
+    
+    Thread-safe implementation using asyncio.Lock for concurrent access.
+    """
 
     def __init__(self, default_ttl_minutes: int = 30):
         self._cache: dict[str, PreviewResponse] = {}
         self._default_ttl = default_ttl_minutes
+        self._lock = asyncio.Lock()
 
     def store(self, preview: PreviewResponse, ttl_minutes: Optional[int] = None) -> str:
         """
@@ -28,10 +33,15 @@ class PreviewCache:
             preview.preview_id = str(uuid.uuid4())
         
         ttl = ttl_minutes or self._default_ttl
-        preview.expires_at = datetime.utcnow() + timedelta(minutes=ttl)
+        preview.expires_at = datetime.now(timezone.utc) + timedelta(minutes=ttl)
         
         self._cache[preview.preview_id] = preview
         return preview.preview_id
+
+    async def store_async(self, preview: PreviewResponse, ttl_minutes: Optional[int] = None) -> str:
+        """Thread-safe async version of store."""
+        async with self._lock:
+            return self.store(preview, ttl_minutes)
 
     def get(self, preview_id: str) -> Optional[PreviewResponse]:
         """
@@ -49,12 +59,17 @@ class PreviewCache:
             return None
         
         # Check expiration
-        if datetime.utcnow() > preview.expires_at:
+        if datetime.now(timezone.utc) > preview.expires_at:
             # Remove expired preview
             del self._cache[preview_id]
             return None
         
         return preview
+
+    async def get_async(self, preview_id: str) -> Optional[PreviewResponse]:
+        """Thread-safe async version of get."""
+        async with self._lock:
+            return self.get(preview_id)
 
     def remove(self, preview_id: str) -> bool:
         """
@@ -71,6 +86,11 @@ class PreviewCache:
             return True
         return False
 
+    async def remove_async(self, preview_id: str) -> bool:
+        """Thread-safe async version of remove."""
+        async with self._lock:
+            return self.remove(preview_id)
+
     def cleanup_expired(self) -> int:
         """
         Remove all expired previews from the cache.
@@ -78,7 +98,7 @@ class PreviewCache:
         Returns:
             Number of expired previews removed
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expired_ids = [
             preview_id
             for preview_id, preview in self._cache.items()
@@ -90,9 +110,19 @@ class PreviewCache:
         
         return len(expired_ids)
 
+    async def cleanup_expired_async(self) -> int:
+        """Thread-safe async version of cleanup_expired."""
+        async with self._lock:
+            return self.cleanup_expired()
+
     def clear(self):
         """Clear all previews from the cache."""
         self._cache.clear()
+
+    async def clear_async(self):
+        """Thread-safe async version of clear."""
+        async with self._lock:
+            self._cache.clear()
 
     def size(self) -> int:
         """Get the current cache size."""

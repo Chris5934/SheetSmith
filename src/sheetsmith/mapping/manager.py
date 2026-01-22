@@ -1,7 +1,7 @@
 """Main mapping manager for header-based column and cell mappings."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from ..sheets import GoogleSheetsClient
@@ -102,7 +102,7 @@ class MappingManager:
 
             if validation.status == MappingStatus.VALID:
                 # Mapping is still valid, update last_validated_at
-                cached.last_validated_at = datetime.utcnow()
+                cached.last_validated_at = datetime.now(timezone.utc)
                 await self.storage.store_column_mapping(cached)
                 return cached
 
@@ -116,7 +116,7 @@ class MappingManager:
                 cached.column_index = self.validator._column_letter_to_index(
                     validation.new_column_letter
                 )
-                cached.last_validated_at = datetime.utcnow()
+                cached.last_validated_at = datetime.now(timezone.utc)
                 await self.storage.store_column_mapping(cached)
                 return cached
 
@@ -166,7 +166,7 @@ class MappingManager:
             column_letter=candidate.column_letter,
             column_index=candidate.column_index,
             header_row=candidate.header_row,
-            last_validated_at=datetime.utcnow(),
+            last_validated_at=datetime.now(timezone.utc),
         )
 
         await self.storage.store_column_mapping(mapping)
@@ -219,7 +219,7 @@ class MappingManager:
 
             if validation.status == MappingStatus.VALID:
                 # Mapping is still valid
-                cached.last_validated_at = datetime.utcnow()
+                cached.last_validated_at = datetime.now(timezone.utc)
                 await self.storage.store_cell_mapping(cached)
                 return cached
 
@@ -236,7 +236,7 @@ class MappingManager:
                 cached.column_letter = col_letter
                 cached.column_index = self.validator._column_letter_to_index(col_letter)
                 cached.row_index = row_num - 1
-                cached.last_validated_at = datetime.utcnow()
+                cached.last_validated_at = datetime.now(timezone.utc)
                 await self.storage.store_cell_mapping(cached)
                 return cached
 
@@ -296,7 +296,7 @@ class MappingManager:
             row_index=row_index,
             column_letter=header_candidate.column_letter,
             column_index=header_candidate.column_index,
-            last_validated_at=datetime.utcnow(),
+            last_validated_at=datetime.now(timezone.utc),
         )
 
         await self.storage.store_cell_mapping(mapping)

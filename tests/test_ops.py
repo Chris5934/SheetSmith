@@ -1,7 +1,7 @@
 """Tests for deterministic operations module."""
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, AsyncMock
 
 from sheetsmith.ops import (
@@ -192,8 +192,8 @@ class TestPreviewCache:
                 requires_approval=False,
             ),
             diff_text="",
-            created_at=datetime.utcnow(),
-            expires_at=datetime.utcnow() + timedelta(minutes=30),
+            created_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
         )
         
         preview_id = cache.store(preview)
@@ -227,8 +227,8 @@ class TestPreviewCache:
                 requires_approval=False,
             ),
             diff_text="",
-            created_at=datetime.utcnow() - timedelta(hours=2),
-            expires_at=datetime.utcnow() - timedelta(hours=1),
+            created_at=datetime.now(timezone.utc) - timedelta(hours=2),
+            expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
         )
         
         # Store it directly in cache without going through store() method
@@ -259,8 +259,8 @@ class TestPreviewCache:
                 requires_approval=False,
             ),
             diff_text="",
-            created_at=datetime.utcnow() - timedelta(hours=2),
-            expires_at=datetime.utcnow() - timedelta(hours=1),
+            created_at=datetime.now(timezone.utc) - timedelta(hours=2),
+            expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
         )
         cache._cache["expired"] = expired
         
@@ -279,8 +279,8 @@ class TestPreviewCache:
                 requires_approval=False,
             ),
             diff_text="",
-            created_at=datetime.utcnow(),
-            expires_at=datetime.utcnow() + timedelta(minutes=30),
+            created_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
         )
         cache.store(valid)
         

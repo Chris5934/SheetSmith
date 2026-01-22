@@ -1,7 +1,7 @@
 """Tool registry for managing available tools."""
 
 from typing import Any, Callable, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ToolParameter(BaseModel):
@@ -18,13 +18,12 @@ class ToolParameter(BaseModel):
 class Tool(BaseModel):
     """Definition of a tool that can be used by the agent."""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     name: str
     description: str
     parameters: list[ToolParameter] = Field(default_factory=list)
     handler: Optional[Callable] = Field(default=None, exclude=True)
-
-    class Config:
-        arbitrary_types_allowed = True
 
     def to_anthropic_schema(self) -> dict:
         """Convert to Anthropic tool schema format."""

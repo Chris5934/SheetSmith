@@ -1,9 +1,14 @@
 """Data models for header-based mapping system."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, Any
 from pydantic import BaseModel, Field
+
+
+def _utc_now() -> datetime:
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
 
 
 class MappingStatus(str, Enum):
@@ -26,7 +31,7 @@ class ColumnMapping(BaseModel):
     column_index: int  # 0-based index
     header_row: int = 0  # Row where header was found
     last_validated_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
     needs_disambiguation: bool = False
     disambiguation_context: Optional[dict[str, Any]] = None
 
@@ -44,7 +49,7 @@ class CellMapping(BaseModel):
     column_letter: str  # Current column position
     column_index: int  # 0-based column index
     last_validated_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
     disambiguation_context: Optional[dict[str, Any]] = None
 
 
@@ -66,7 +71,7 @@ class DisambiguationRequest(BaseModel):
     sheet_name: str
     header_text: str
     candidates: list[ColumnCandidate]
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
 
 
 class DisambiguationResponse(BaseModel):
@@ -116,7 +121,7 @@ class MappingAuditReport(BaseModel):
     missing_count: int
     ambiguous_count: int
     entries: list[MappingAuditEntry]
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=_utc_now)
 
 
 class DisambiguationRequiredError(Exception):

@@ -2,7 +2,7 @@
 
 import logging
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..config import settings
 from ..sheets import GoogleSheetsClient
@@ -183,7 +183,7 @@ class SafetyChecker:
         # This is a placeholder implementation
         # In production, would integrate with MappingManager to validate mappings
         report = AuditReport(
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             spreadsheet_id=spreadsheet_id,
             mappings_checked=0,
             valid_mappings=0,

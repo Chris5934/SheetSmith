@@ -4,7 +4,7 @@ import re
 import uuid
 import logging
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from ..sheets import GoogleSheetsClient
 from ..engine.differ import FormulaDiffer
@@ -105,8 +105,8 @@ class PreviewGenerator:
             changes=changes,
             scope=scope,
             diff_text=diff_text,
-            created_at=datetime.utcnow(),
-            expires_at=datetime.utcnow() + timedelta(seconds=ttl_seconds),
+            created_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds),
         )
 
     def _preview_replace_in_formulas(

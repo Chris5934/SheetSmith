@@ -2,8 +2,13 @@
 
 from enum import Enum
 from typing import Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
+
+
+def _utc_now() -> datetime:
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
 
 
 class OperationType(str, Enum):
@@ -117,7 +122,7 @@ class PreviewResponse(BaseModel):
     changes: list[ChangeSpec]
     scope: ScopeInfo
     diff_text: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
     expires_at: datetime
 
 
@@ -138,4 +143,4 @@ class ApplyResponse(BaseModel):
     cells_updated: int
     errors: list[str] = Field(default_factory=list)
     audit_log_id: Optional[str] = None
-    applied_at: datetime = Field(default_factory=datetime.utcnow)
+    applied_at: datetime = Field(default_factory=_utc_now)

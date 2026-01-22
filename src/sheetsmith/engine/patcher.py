@@ -1,7 +1,7 @@
 """Patch management and application engine."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from ..sheets import GoogleSheetsClient, BatchUpdate
@@ -35,7 +35,7 @@ class PatchEngine:
             spreadsheet_id=spreadsheet_id,
             description=description,
             changes=changes,
-            created_at=datetime.utcnow().isoformat(),
+            created_at=datetime.now(timezone.utc).isoformat(),
             status="pending",
         )
         self._pending_patches[patch.id] = patch

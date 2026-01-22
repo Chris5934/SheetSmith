@@ -3,7 +3,7 @@
 import logging
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from ..sheets import GoogleSheetsClient
@@ -313,7 +313,7 @@ class DeterministicOpsEngine:
         
         entry = AuditEntry(
             id=str(uuid.uuid4()),
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             operation_type=operation.operation_type.value,
             spreadsheet_id=spreadsheet_id,
             user="system",

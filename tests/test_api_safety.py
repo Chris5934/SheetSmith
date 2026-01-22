@@ -126,7 +126,7 @@ class TestDryRunSupport:
     def test_preview_with_dry_run(self, mock_get_engine, client):
         """Test preview endpoint with dry_run flag."""
         from sheetsmith.ops.models import PreviewResponse, ScopeInfo
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         
         # Setup mock
         mock_engine = Mock()
@@ -144,8 +144,8 @@ class TestDryRunSupport:
                 requires_approval=False,
             ),
             diff_text="",
-            created_at=datetime.utcnow(),
-            expires_at=datetime.utcnow() + timedelta(minutes=30),
+            created_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
         )
         mock_engine.generate_preview.return_value = mock_preview
         mock_get_engine.return_value = mock_engine
@@ -174,7 +174,7 @@ class TestDryRunSupport:
     def test_apply_with_dry_run(self, mock_get_engine, client):
         """Test apply endpoint with dry_run flag."""
         from sheetsmith.ops.models import ApplyResponse
-        from datetime import datetime
+        from datetime import datetime, timezone
         
         # Setup mock
         mock_engine = Mock()
@@ -184,7 +184,7 @@ class TestDryRunSupport:
             spreadsheet_id="test-sheet-123",
             cells_updated=10,
             errors=[],
-            applied_at=datetime.utcnow(),
+            applied_at=datetime.now(timezone.utc),
         )
         mock_engine.apply_changes = AsyncMock(return_value=mock_result)
         mock_get_engine.return_value = mock_engine

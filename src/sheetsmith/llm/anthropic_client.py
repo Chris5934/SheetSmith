@@ -20,13 +20,17 @@ class AnthropicClient(LLMClient):
         model: str,
     ) -> LLMResponse:
         """Create a message with Claude."""
-        response = self.client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            system=system,
-            tools=tools,
-            messages=messages,
-        )
+        # Build kwargs, only including tools if non-empty to avoid API issues
+        kwargs = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "system": system,
+            "messages": messages,
+        }
+        if tools:
+            kwargs["tools"] = tools
+            
+        response = self.client.messages.create(**kwargs)
 
         return LLMResponse(
             content=response.content,

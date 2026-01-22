@@ -2,7 +2,7 @@
 
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from .models import (
@@ -72,7 +72,7 @@ class DisambiguationHandler:
             return None
 
         # Check if request has expired
-        if datetime.utcnow() - request.created_at > self._request_ttl:
+        if datetime.now(timezone.utc) - request.created_at > self._request_ttl:
             logger.info(f"Disambiguation request {request_id} has expired")
             del self._pending_requests[request_id]
             return None
@@ -138,7 +138,7 @@ class DisambiguationHandler:
             ColumnMapping with disambiguation context
         """
         disambiguation_context = {
-            "disambiguated_at": datetime.utcnow().isoformat(),
+            "disambiguated_at": datetime.now(timezone.utc).isoformat(),
             "selected_index": response.selected_column_index,
             "user_label": response.user_label,
             "total_candidates": len(request.candidates),
@@ -152,7 +152,7 @@ class DisambiguationHandler:
             column_index=selected.column_index,
             header_row=selected.header_row,
             disambiguation_context=disambiguation_context,
-            last_validated_at=datetime.utcnow(),
+            last_validated_at=datetime.now(timezone.utc),
         )
 
         return mapping
@@ -164,7 +164,7 @@ class DisambiguationHandler:
         Returns:
             Number of expired requests removed
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expired = [
             request_id
             for request_id, request in self._pending_requests.items()

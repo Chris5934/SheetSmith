@@ -1,8 +1,13 @@
 """Data models for the memory/persistence layer."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Any
 from pydantic import BaseModel, Field
+
+
+def _utc_now() -> datetime:
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
 
 
 class Rule(BaseModel):
@@ -14,8 +19,8 @@ class Rule(BaseModel):
     rule_type: str  # "formula_style", "naming", "structure", "custom"
     content: str  # The actual rule text or pattern
     examples: list[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
+    updated_at: datetime = Field(default_factory=_utc_now)
     tags: list[str] = Field(default_factory=list)
 
 
@@ -29,8 +34,8 @@ class LogicBlock(BaseModel):
     formula_pattern: str  # The formula pattern for this logic
     variables: dict[str, str] = Field(default_factory=dict)  # Variable name -> description
     version: str = "1.0"
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
+    updated_at: datetime = Field(default_factory=_utc_now)
     tags: list[str] = Field(default_factory=list)
 
 
@@ -38,7 +43,7 @@ class AuditLog(BaseModel):
     """An audit log entry for tracking changes."""
 
     id: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
     action: str  # "search", "update", "batch_update", "rule_change"
     spreadsheet_id: Optional[str] = None
     description: str
@@ -54,7 +59,7 @@ class FixSummary(BaseModel):
     title: str
     description: str
     spreadsheet_id: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
     pattern_searched: Optional[str] = None
     cells_modified: int = 0
     before_example: Optional[str] = None

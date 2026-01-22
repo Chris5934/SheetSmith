@@ -1,6 +1,6 @@
 """Tests for memory models."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 from sheetsmith.memory.models import Rule, LogicBlock, AuditLog, FixSummary
@@ -54,7 +54,7 @@ class TestRuleModel:
 
     def test_rule_default_timestamps(self):
         """Test that Rule creates default timestamps."""
-        before = datetime.utcnow()
+        before = datetime.now(timezone.utc)
         rule = Rule(
             id="rule-789",
             name="Timestamp Test",
@@ -62,7 +62,7 @@ class TestRuleModel:
             rule_type="custom",
             content="Test content",
         )
-        after = datetime.utcnow()
+        after = datetime.now(timezone.utc)
 
         assert before <= rule.created_at <= after
         assert before <= rule.updated_at <= after
@@ -149,7 +149,7 @@ class TestLogicBlockModel:
 
     def test_logic_block_default_timestamps(self):
         """Test that LogicBlock creates default timestamps."""
-        before = datetime.utcnow()
+        before = datetime.now(timezone.utc)
         block = LogicBlock(
             id="block-time",
             name="Time Test",
@@ -157,7 +157,7 @@ class TestLogicBlockModel:
             description="Test",
             formula_pattern="=TEST()",
         )
-        after = datetime.utcnow()
+        after = datetime.now(timezone.utc)
 
         assert before <= block.created_at <= after
         assert before <= block.updated_at <= after
@@ -228,13 +228,13 @@ class TestAuditLogModel:
 
     def test_audit_log_default_timestamp(self):
         """Test that AuditLog creates default timestamp."""
-        before = datetime.utcnow()
+        before = datetime.now(timezone.utc)
         log = AuditLog(
             id="log-time",
             action="test",
             description="Timestamp test",
         )
-        after = datetime.utcnow()
+        after = datetime.now(timezone.utc)
 
         assert before <= log.timestamp <= after
 
@@ -320,14 +320,14 @@ class TestFixSummaryModel:
 
     def test_fix_summary_default_timestamp(self):
         """Test that FixSummary creates default timestamp."""
-        before = datetime.utcnow()
+        before = datetime.now(timezone.utc)
         summary = FixSummary(
             id="fix-time",
             title="Timestamp Test",
             description="Test timestamp",
             spreadsheet_id="sheet-time",
         )
-        after = datetime.utcnow()
+        after = datetime.now(timezone.utc)
 
         assert before <= summary.timestamp <= after
 
