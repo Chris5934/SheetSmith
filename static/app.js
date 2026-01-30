@@ -131,7 +131,7 @@ class SheetSmithApp {
         this.clearFormBtn?.addEventListener('click', () => this.clearForm());
         
         // AI mode
-        this.analyzeRequestBtn?.addEventListener('click', () => this.analyzeAiRequest());
+        this.analyzeRequestBtn?.addEventListener('click', () => this.sendChatMessage());
         this.clearAiBtn?.addEventListener('click', () => this.clearAi());
         this.useSuggestionBtn?.addEventListener('click', () => this.useSuggestion());
         this.refineBtn?.addEventListener('click', () => {
@@ -142,7 +142,7 @@ class SheetSmithApp {
         // AI input keyboard shortcut
         this.aiInput?.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.key === 'Enter') {
-                this.analyzeAiRequest();
+                this.sendChatMessage();
             }
         });
         
@@ -430,6 +430,7 @@ class SheetSmithApp {
         
         if (operationType === 'replace_in_formulas') {
             const header = this.headerName?.value.trim();
+            const headerRow = document.getElementById('replace-header-row')?.value;
             const findText = this.findText?.value.trim();
             const replaceText = this.replaceText?.value.trim();
             
@@ -447,6 +448,7 @@ class SheetSmithApp {
                 body: JSON.stringify({
                     spreadsheet_id: this.spreadsheetId,
                     header_text: header,
+                    header_row: parseInt(headerRow) || 1,
                     find: findText,
                     replace: replaceText,
                     sheet_names: sheets,
@@ -716,47 +718,72 @@ class SheetSmithApp {
         this.addActivity('Exported preview to JSON');
     }
 
-    async analyzeAiRequest() {
+    async sendChatMessage() {
         const message = this.aiInput?.value.trim();
         if (!message || !this.spreadsheetId) {
             this.showError('Please enter a request and connect to a spreadsheet');
             return;
         }
+
+        // Add user message to UI
+        this.appendMessage('user', message);
+        this.aiInput.value = '';
         
         this.analyzeRequestBtn.disabled = true;
-        this.analyzeRequestBtn.textContent = 'Analyzing...';
+        this.analyzeRequestBtn.textContent = 'Thinking...';
         
         try {
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: `Convert this to a deterministic operation JSON: ${message}`,
+                    message: message,
                     spreadsheet_id: this.spreadsheetId
                 })
             });
             
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.detail || 'Failed to analyze request');
+                throw new Error(error.detail || 'Failed to get response');
             }
             
             const data = await response.json();
-            this.showAiSuggestion(data.response);
-            this.addActivity('AI analyzed request');
+            this.appendMessage('agent', data.response);
+            this.addActivity('Agent responded');
         } catch (error) {
             this.showError(error.message);
+            this.appendMessage('error', `Error: ${error.message}`);
         } finally {
             this.analyzeRequestBtn.disabled = false;
-            this.analyzeRequestBtn.textContent = 'Analyze Request';
+            this.analyzeRequestBtn.textContent = 'Send';
         }
     }
 
-    showAiSuggestion(response) {
-        if (!this.aiSuggestion || !this.aiSuggestionContent) return;
+    appendMessage(role, text) {
+        if (!this.aiMessages) return;
         
-        this.aiSuggestionContent.textContent = response;
-        this.aiSuggestion.classList.remove('hidden');
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${role}`;
+        
+        // Simple markdown parsing for code blocks
+        let formattedText = this.escapeHtml(text)
+            .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+            .replace(/\n/g, '<br>');
+            
+        msgDiv.innerHTML = `
+            <div class="message-content">${formattedText}</div>
+        `;
+        
+        this.aiMessages.appendChild(msgDiv);
+        this.aiMessages.scrollTop = this.aiMessages.scrollHeight;
+        
+        // Also hide the old suggestion box if it exists
+        if (this.aiSuggestion) this.aiSuggestion.classList.add('hidden');
+    }
+
+    // showAiSuggestion is deprecated but kept for compatibility if needed
+    showAiSuggestion(response) {
+        this.appendMessage('agent', response);
     }
 
     useSuggestion() {

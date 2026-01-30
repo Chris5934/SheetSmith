@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from ..sheets import GoogleSheetsClient, BatchUpdate
+from ..sheets.client import index_to_col_letter
 from ..sheets.models import FormulaMatch
 from .safety import SafetyValidator
 
@@ -20,6 +21,8 @@ class ReplacementPlan:
     search_pattern: str  # What to search for
     replace_with: str  # What to replace it with
     target_sheets: Optional[list[str]] = None  # Specific sheets, or None for all
+    column_header: Optional[str] = None  # Specific column by header name
+    header_row: int = 1  # Row index (1-based) where headers are located
     case_sensitive: bool = False
     is_regex: bool = False  # If True, search_pattern is treated as regex
     dry_run: bool = False
@@ -79,6 +82,8 @@ class DeterministicReplacer:
                 sheet_names=plan.target_sheets,
                 case_sensitive=plan.case_sensitive,
                 is_regex=plan.is_regex,
+                column_header=plan.column_header,
+                header_row=plan.header_row,
             )
 
             if not matches:
@@ -170,17 +175,106 @@ class DeterministicReplacer:
         sheet_names: Optional[list[str]],
         case_sensitive: bool,
         is_regex: bool,
+        column_header: Optional[str] = None,
+        header_row: int = 1,
     ) -> list[FormulaMatch]:
-        """Search for formulas matching the pattern."""
-        # For exact matches, escape regex special characters
-        search_pattern = pattern if is_regex else re.escape(pattern)
+        """Search for formulas matching the pattern, optionally restricted to a column header."""
+        
+        # Original logic if no column_header
+        if not column_header:
+            # For exact matches, escape regex special characters
+            search_pattern = pattern if is_regex else re.escape(pattern)
 
-        return self.sheets_client.search_formulas(
-            spreadsheet_id=spreadsheet_id,
-            pattern=search_pattern,
-            sheet_names=sheet_names,
-            case_sensitive=case_sensitive,
-        )
+            return self.sheets_client.search_formulas(
+                spreadsheet_id=spreadsheet_id,
+                pattern=search_pattern,
+                sheet_names=sheet_names,
+                case_sensitive=case_sensitive,
+            )
+
+        # Optimized logic for column header constraint
+        matches = []
+        info = self.sheets_client.get_spreadsheet_info(spreadsheet_id)
+        
+        # Filter sheets
+        target_sheets = [s for s in info["sheets"] 
+                        if not sheet_names or s["title"] in sheet_names]
+        
+        regex_flags = 0 if case_sensitive else re.IGNORECASE
+        try:
+            compiled_pattern = re.compile(pattern if is_regex else re.escape(pattern), regex_flags)
+        except re.error as e:
+            raise ValueError(f"Invalid regex pattern: {e}")
+
+        for sheet in target_sheets:
+            logger.info(f"Scanning sheet '{sheet['title']}' for header '{column_header}' at row {header_row}")
+            
+            if sheet['col_count'] <= 0:
+                continue
+                
+            last_col_letter = index_to_col_letter(sheet["col_count"] - 1)
+            # Read just the header row
+            header_range = f"'{sheet['title']}'!A{header_row}:{last_col_letter}{header_row}"
+            
+            try:
+                # include_formulas=False for headers
+                headers = self.sheets_client.read_range(
+                    spreadsheet_id, header_range, include_formulas=False
+                )
+            except Exception as e:
+                logger.warning(f"Failed to read headers for sheet {sheet['title']}: {e}")
+                continue
+
+            # Find matching column
+            target_col_idx = -1
+            if headers.cells:
+                for cell in headers.cells:
+                    # cell.row should match header_row
+                    if cell.row == header_row and cell.value and str(cell.value).strip().lower() == column_header.lower():
+                        target_col_idx = cell.col
+                        break
+            
+            if target_col_idx == -1:
+                logger.debug(f"Header '{column_header}' not found in sheet '{sheet['title']}'")
+                continue
+
+            # Read that column only
+            col_letter = index_to_col_letter(target_col_idx)
+            # Read from row AFTER header to end
+            start_row = header_row + 1
+            data_range = f"'{sheet['title']}'!{col_letter}{start_row}:{col_letter}{sheet['row_count']}"
+            
+            logger.info(f"Found header in column {col_letter}. Reading data...")
+            try:
+                col_data = self.sheets_client.read_range(
+                    spreadsheet_id, data_range, include_formulas=True
+                )
+            except Exception as e:
+                logger.warning(f"Failed to read column {col_letter} in sheet {sheet['title']}: {e}")
+                continue
+                
+            # Scan formulas in this column
+            sheet_matches_count = 0
+            for cell in col_data.cells:
+                if cell.formula:
+                    match = compiled_pattern.search(cell.formula)
+                    if match:
+                        matches.append(
+                            FormulaMatch(
+                                spreadsheet_id=spreadsheet_id,
+                                sheet_name=sheet["title"],
+                                cell=cell.cell,
+                                row=cell.row,
+                                col=cell.col,
+                                formula=cell.formula,
+                                matched_text=match.group(0),
+                            )
+                        )
+                        sheet_matches_count += 1
+                        
+            logger.info(f"Found {sheet_matches_count} matches in column {col_letter} of '{sheet['title']}'")
+
+        return matches
 
     def _generate_replacements(
         self,

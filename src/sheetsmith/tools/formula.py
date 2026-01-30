@@ -28,13 +28,15 @@ class FormulaTools:
             replace_with: str,
             description: str = "",
             target_sheets: Optional[list[str]] = None,
+            column_header: Optional[str] = None,
+            header_row: int = 1,
             case_sensitive: bool = False,
             is_regex: bool = False,
             dry_run: bool = False,
         ) -> dict:
             """
             Perform deterministic mass replacement of formulas.
-
+            
             This tool bypasses LLM for the actual replacement operation,
             using direct string/regex replacement for efficiency.
             """
@@ -43,6 +45,8 @@ class FormulaTools:
                 search_pattern=search_pattern,
                 replace_with=replace_with,
                 target_sheets=target_sheets,
+                column_header=column_header,
+                header_row=header_row,
                 case_sensitive=case_sensitive,
                 is_regex=is_regex,
                 dry_run=dry_run,
@@ -128,6 +132,19 @@ class FormulaTools:
                     type="array",
                     description="Optional list of sheet names to limit the replacement (default: all sheets)",
                     required=False,
+                ),
+                ToolParameter(
+                    name="column_header",
+                    type="string",
+                    description="Optional column header to restrict the replacement to (e.g., 'Abloom'). Logic: Scans headers (row 1) to find the column.",
+                    required=False,
+                ),
+                ToolParameter(
+                    name="header_row",
+                    type="integer",
+                    description="The row number where the header is located (1-based, default: 1). Only used if column_header is set.",
+                    required=False,
+                    default=1,
                 ),
                 ToolParameter(
                     name="case_sensitive",
