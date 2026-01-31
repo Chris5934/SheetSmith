@@ -206,7 +206,10 @@ class DeterministicReplacer:
         except re.error as e:
             raise ValueError(f"Invalid regex pattern: {e}")
 
+        import time
         for sheet in target_sheets:
+            print(f"Scanning sheet '{sheet['title']}' for header '{column_header}'...")
+            time.sleep(1.0) # Throttle to avoid 429 Quota Exceeded
             logger.info(f"Scanning sheet '{sheet['title']}' for header '{column_header}' at row {header_row}")
             
             if sheet['col_count'] <= 0:
@@ -235,11 +238,12 @@ class DeterministicReplacer:
                         break
             
             if target_col_idx == -1:
-                logger.debug(f"Header '{column_header}' not found in sheet '{sheet['title']}'")
+                # logger.debug(f"Header '{column_header}' not found in sheet '{sheet['title']}'")
                 continue
 
-            # Read that column only
             col_letter = index_to_col_letter(target_col_idx)
+
+            # Read that column only
             # Read from row AFTER header to end
             start_row = header_row + 1
             data_range = f"'{sheet['title']}'!{col_letter}{start_row}:{col_letter}{sheet['row_count']}"
